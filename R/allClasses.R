@@ -1,4 +1,4 @@
-cache = setRefClass("Cache",
+cacheClass = setRefClass("Cache",
             fields = list(
                 .cache_data = "list",
                  cache_data = function(value)
@@ -22,7 +22,10 @@ cache = setRefClass("Cache",
                     if(missing(value))
                         .type
                     else
-                        .type <<- value
+                        {
+                            value = match.arg(value, c("both", "memory", "disk", "disk-tmp"))
+                            .type <<- value
+                        }
                 },
                 .cache_dirs= "character",
                 cache_dirs= function(value)
@@ -33,35 +36,38 @@ cache = setRefClass("Cache",
                         .cache_dirs <<- value
                 }),
             methods = list(
-                find_cache = function(hash, check_disk = TRUE, extra_dirs = NULL)
+                find_data= function(hash, check_disk = TRUE, extra_dirs = NULL)
                 {
                     if(hash %in% names(.self$cache_data))
                         return(.self$cache_data[[hash]])
                     ret = NA
                     if(check_disk)
                         {
-                            dirs = c(.self$temp_cach_dir, extra_dirs)
+                            dirs = c(.self$tmp_cache_dir, extra_dirs)
                             allcache_data = unlist(lapply(dirs, function(d) {
                                 ret = list.dirs(d)
                                 ret[grepl("cache", ret)]
                             }))
                             hasHash = grepl(hash, allcache_data)
                             if(any(hasHash))
-                                ret = readCache(allcache_data[hasHash][1])
+                                {
+                                    ret = readCachedData(allcache_data[hasHash][1])
+                                    .self$add_data(ret)
+                                }
                         }
 
                     ret
                 },
-                to_disk = function(dir)
+                to_disk = function(dir, clear_mem)
                 {
                     if(missing(dir))
                         dir = .self$cache_dirs[1]
                     if(is.na(dir))
                         stop("No directory to write to specified and no default location is available")
 
-                    sapply(.self$cache_data, function(x) x$to_disk(dir))
+                    sapply(.self$cache_data, function(x) x$to_disk(location = dir, clear_mem = clear_mem))
                 },
-                from_disk = function( dirs, hashes = NULL)
+                populate= function( dirs = c(.self$cache_dirs, .self$tmp_cache_dir), hashes = NULL, refresh = FALSE, load_data = FALSE)
                 {
                     for(d in dirs)
                         {
@@ -70,13 +76,48 @@ cache = setRefClass("Cache",
                             if(!is.null(hashes))
                                 fils = fils[grepl(paste0("(", paste(hashes, collapse = "|"), ")"), fils)]
 
-                            .self$cache_data = c(.self$cache_data, lapply(fils, readCache))
+                            newcdata = lapply(fils, readCachedData, load_data= load_data)
+                            newhashes = sapply(newcdata, function(x) x$hash)
+                            if(!refresh)
+                                {
+                                    #only read hashes we don't already have caches for in memory (in this cache)
+                                    new = which(!(newhashes %in% sapply(cache_data, function(x) x$hash)))
+                                    newcdata = newcdata[new]
+                                    newhashes = newhashes[new]
+                                }
+                            
+                            .cache_data[newhashes] <<-  newcdata
                         }
+                },
+                add_data = function(dat)
+                {
+                    cache_data[[dat$hash]] <<- dat
                 },
                 mem_size = function()
                 {
                     sum(sapply(.self$cache_data, function(x) x$mem_size()))
-                ))
+                },
+                initialize = function(..., populate = TRUE)
+                {
+                    res = callSuper(...)
+                    if(populate)
+                        .self$populate()
+                    res
+                },
+                load_in_mem = function(hashes = names(.self$cache_data))
+                {
+                    sapply(cache_data[hashes], function(x) x$from_disk())
+                },
+                unload_mem = function(write_to_disk = TRUE)
+                {
+                    if(write_to_disk)
+                        .self$to_disk(clear_mem = TRUE)
+                    else
+                        sapply(cache_data, function(x) x$unload_mem())
+                }
+                
+                )
+    )
 
 
 cachedData = setRefClass("CachedData",
@@ -92,14 +133,15 @@ cachedData = setRefClass("CachedData",
         disk_location = "character",
         tmp_disk_location = "character",
         .data = "environment",
-        last_used = "ANY"),
+        last_used = "ANY",
+        file_stale = "logical"),
     methods = list(
         mem_size = function()
         {
-            if(is.na(data))
+            if(!length(ls(envir = .data)))
                 0
             else
-                as.integer(object.size(.self$.data))
+                sum(sapply(.data, object.size))
         },
         retrieve_data = function( env = parent.frame()) #XXX this may go all wonky and grab the wrong frame. Check it!!!
         {
@@ -115,8 +157,16 @@ cachedData = setRefClass("CachedData",
             last_used <<- Sys.time()
             nams
         },
-        to_disk = function(tmp = FALSE, clear_mem = TRUE,location)
+        unload_mem = function()
         {
+            rm(list = ls(envir = .data), env = .data)
+        },
+        to_disk = function(tmp = FALSE, clear_mem = TRUE,force = FALSE, location)
+        {
+            #check if there is something to write, otherwise immediately return
+            if(!is.na(file_stale) && !file_stale && !force && (location == disk_location || (tmp && location == tmp_disk_location)))
+                return()
+            
             if(!missing(location))
                 {
                     if(tmp)
@@ -138,7 +188,8 @@ cachedData = setRefClass("CachedData",
             nams = ls(env = .data)
             save(list=nams, envir=.data, file = file.path(location, paste0(paste("cache",hash, sep="_"), ".rda")))
             if(clear_mem)
-                rm(list = nams, envir = .data)
+#                rm(list = nams, envir = .data)
+                .self$unload_mem()
             nams
         },
         from_disk = function(location, hsh)
@@ -161,7 +212,7 @@ cachedData = setRefClass("CachedData",
                 } else if (missing(hsh)) {
                     stop("Attempted to call from_disk with no hash specified or associated with the Cache object")
                 }
-            load(file=file.path(location, paste0(paste("cache", hsh, sep="_"), ".rda")), envir = .data)
+            load(file=file.path(location, paste0(hsh, ".rda")), envir = .data)
         })
     )
         

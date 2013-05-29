@@ -1,7 +1,7 @@
-Package: cacheR
+Package: RCacheSuite
 Version: 0.0-1
 Title: Dependency-Aware Caching
-Description: A caching mechanism which takes into account both code content and the value(s) of any input variables the code uses
+Description: A suite of in-memory and on-disk caching mechanisms which can take into account both code content and the value(s) of any input variables the code uses
 Author: Gabriel Becker
 Depends: methods, CodeDepends, digest
 Suggests:  RUnit 
