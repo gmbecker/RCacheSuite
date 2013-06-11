@@ -13,6 +13,8 @@ parseEval = function(code, env, ...)
 
 
 ##Old Version, New version below uses cache classes and supports in memory and on disk caching
+if(FALSE)
+    {
 evalWithCache = function(code, codeInfo, inputvars, outputvars, cachedir = "./", evaluator = function(x) parseEval(x, envir), clearStaleCache = FALSE, verbose = FALSE, envir = .GlobalEnv, ...)
   {
     if(missing(inputvars)||missing(outputvars))
@@ -74,7 +76,7 @@ evalWithCache = function(code, codeInfo, inputvars, outputvars, cachedir = "./",
     return(xxx_returnvalue)
   }
 
-
+}
 
 #because we don't return it, the cache MUST already exist!
 #Actually, I guess if we didn't, it could just write the cache to disk as it is released, reproducing behavior of other caching systems
@@ -107,27 +109,30 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
             stop(paste("Missing variable(s) required to evaluate codeblock:", inputVars[!in_exist], collapse = " "))
         
         #make the list we will digest to get the hash. It includes the (properly handled) code as well as the current values of all the input variables
-        diglist = c(pcode, lapply(inputVars, get))
-        hash = digest(diglist)
+        #diglist = c(pcode, lapply(inputVars, get))
+        chash = digest(pcode)
+        ihash = digest(lapply(inputVars, get))
 
-        fnd = cache$find_data(hash)
-        if(!is.na(fnd) && !force)
+        fnd = cache$find_data(chash, ihash)
+        if(is(fnd, "CachedData") && !force)
             {
                 if(verbose)
-                    cat(paste(sprintf("\nExisting cache found for hash %s", hash),"\n"))
+                    cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
                 fnd$retrieve_data(env)
                 xxx_returnvalue = get("xxx_returnvalue", env)
             } else {
                 if(verbose)
-                    cat(paste(sprintf("\nNo cache found. Creating new cache for hash %s",hash), "\n"))
+                    cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
                 
                 xxx_returnvalue = evaluator(code, env,  ...)
                 outlist = c("xxx_returnvalue", outputVars, "pcode")
                 #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
-                newcd = cachedData$new(hash = hash, disk_location = cache$cache_dirs[1], tmp_disk_location = cache$tmp_cache_dir, .data = new.env(), file_stale = TRUE)
+                cset = cache$get_or_create_set(chash, inputVars, outputVars)
+                newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE)
                 for(o in outlist)
                     assign(o, get(o), newcd$.data)
-                cache$add_data(newcd)
+               # cache$add_data(newcd)
+                cset$add_data(newcd)
             }
         return(xxx_returnvalue)
     }
