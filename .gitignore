@@ -29,5 +29,6 @@
 */*/*/*.Rhistory
 */*/*/*/*.Rhistory
 
-inst/tests/*cache*
+inst/tests/code_*/cache_*
+inst/tests/code_*
 
