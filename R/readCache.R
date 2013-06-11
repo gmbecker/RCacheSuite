@@ -1,17 +1,26 @@
 readCachedData = function(dir, load_data = TRUE)
     {
-        hash = gsub(".*_([[:alnum:]]*).*", "\\1", dir)
-        cacheout = new("CachedData", hash = hash, .data = new.env(),disk_location = dir, file_stale = FALSE)
-        if(load_data)
-            load(file = file.path(dir, paste0(hash, ".rda")), envir = cacheout$.data)
-        cacheout
+       # ihash = gsub(".*_([[:alnum:]]*).*", "\\1", dir)
+       # chash = gsub(".*_([[:alnum:]]*).*", "\\1", normalizePath(file.path(dir, "..")))
+        chash = gsub(".*_([[:alnum:]]*).*", "\\1", normalizePath(file.path(dir, "..")))
+        fils = list.files(dir, pattern="cache_", full.names=TRUE)
+        ihashes = gsub(".*_([[:alnum:]]*).*", "\\1", fils)
+        if(!length(fils))
+            return(list())
+        mapply(function(file, ihash, chash)
+               {
+                   cacheout = new("CachedData", code_hash = chash, inputs_hash = ihash, .data = new.env(),disk_location = dirname(file), file_stale = FALSE)
+                   if(load_data)
+                       load(file = file, envir = cacheout$.data)
+                   cacheout
+               }, file = fils, ihash = ihashes, chash = chash)
     }
 
 
 readCodeCache = function(dir, load_data = TRUE)
     {
       hash = gsub(".*_([[:alnum:]]*).*", "\\1", dir)
-      code = deparse(parse(file.path(dir, "code.R")))
+      code = unparse(parse(file.path(dir, "code.R"), keep.source=FALSE))
       cSetOut = new("CodeCacheSet", hash = hash, cache_dir = dir, code = code)
       cSetOut$populate(load_data = load_data)
       cSetOut

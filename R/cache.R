@@ -101,8 +101,9 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
             }
         
          #parse and deparse the code to get rid of the annoying "adding a space invalidates the cache" issue other systems have
-        pcode = deparse(parse(text=code, keep.source=FALSE))
-
+        #pcode = deparse(parse(text=code, keep.source=FALSE))
+      #  pcode = sapply(parse(text=code, keep.source=FALSE), deparse)
+        pcode = unparse(parse(text=code, keep.source=FALSE))
     #do the required inputs even exist in the current session?
         in_exist = sapply(inputVars, exists)
         if(!all(in_exist))
@@ -110,6 +111,7 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
         
         #make the list we will digest to get the hash. It includes the (properly handled) code as well as the current values of all the input variables
         #diglist = c(pcode, lapply(inputVars, get))
+#        chash = digest(sapply(pcode, deparse))
         chash = digest(pcode)
         ihash = digest(lapply(inputVars, get))
 
@@ -127,7 +129,7 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
                 xxx_returnvalue = evaluator(code, env,  ...)
                 outlist = c("xxx_returnvalue", outputVars, "pcode")
                 #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
-                cset = cache$get_or_create_set(chash, inputVars, outputVars)
+                cset = cache$get_or_create_set(pcode, inputVars, outputVars)
                 newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE)
                 for(o in outlist)
                     assign(o, get(o), newcd$.data)

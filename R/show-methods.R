@@ -2,7 +2,7 @@ setMethod("show", "CachingEngine",
           function(object)
           {
        #       browser()
-              sizes = unlist(sapply(object$cache_sets, function(lst) sapply(lst, function(x) x$mem_size())))
+              sizes = unlist(sapply(object$cache_sets, function(lst) sapply(lst$cache_data, function(x) x$mem_size())))
                      
               #if the input is list(), sapply always returns list()!
               if(!length(sizes))

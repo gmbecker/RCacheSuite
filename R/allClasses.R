@@ -75,21 +75,11 @@ cacheClass = setRefClass("CachingEngine",
         },
         get_or_create_set = function(code, inputs = NULL, outputs = NULL)
         {
-
-            if(is(code, "expression"))
-                {
-                    rawcode = unlist(lapply(expression, deparse))
-                    pcode = code
-                } else {
-                    rawcode = code
-                    pcode = parse(text=code, keep.source=FALSE)
-                }
+        
                         
             if(is.null(inputs)|| is.null(outputs))
                 {
-    
-    
-                    code2 = paste("{", rawcode, "}", collapse="\n")
+                    code2 = paste("{", code, "}", collapse="\n")
                     #hack to get CodeDepends to treat the code as a single block...
                     #if(!(grepl("\\{", code2)[1] && grepl("\\}", code2)[length(code2)]))
                     # code2 = paste("{", code2, "}", collapse="\n")
@@ -100,14 +90,16 @@ cacheClass = setRefClass("CachingEngine",
                     inputs = codeInfo@inputs
                     outputs = codeInfo@outputs
                 }
-
-            chash = digest(deparse(pcode))
+            pcode = unparse(parse(text=code, keep.source=FALSE))
+            if(!identical(pcode, code))
+                warning("unparse(parse(code)) and code are not identical. This could potentially cause a hash mismatch. Perhaps unparsed code was passed into get_or_create_set?")
+            chash = digest(pcode)
             if(chash %in% names(cache_sets))
                 cache_sets[[chash]]
             else
                 {
                     newset = new("CodeCacheSet",
-                        code = rawcode,
+                        code = pcode,
                         hash = chash,
                         cache_dir = file.path(.self$base_dir, sprintf("code_%s", chash)),
                         inputs = inputs,
@@ -137,7 +129,8 @@ cacheClass = setRefClass("CachingEngine",
             else
                 dir = .self$tmp_base_dir
             
-            invisible(sapply(cache_sets, function(x, dir, clr) x$to_disk(dir, clr), dir = dir, clr = clear_mem))
+        #    invisible(sapply(cache_sets, function(x, dir, clr) x$to_disk(dir, clr), dir = dir, clr = clear_mem))
+            invisible(sapply(cache_sets, function(x, clr) x$to_disk(clear_mem= clr), clr = clear_mem))
         }
         
         )
@@ -214,25 +207,29 @@ codeCacheSet = setRefClass("CodeCacheSet",
     methods = list(
         find_data= function(hash, check_disk = TRUE, extra_dirs = NULL)
         {
-            if(hash %in% names(.self$cache_data))
-                return(.self$cache_data[[hash]])
-            ret = NA
             if(check_disk)
-                {
-                    dirs = c(.self$tmp_cache_dir, extra_dirs)
-                    allcache_data = unlist(lapply(dirs, function(d) {
-                        ret = list.dirs(d)
-                        ret[grepl("cache", ret)]
-                    }))
-                    hasHash = grepl(hash, allcache_data)
-                    if(any(hasHash))
-                        {
-                            ret = readCachedData(allcache_data[hasHash][1])
-                            .self$add_data(ret)
-                        }
-                }
-            
-            ret
+                .self$populate(refresh_existing = FALSE)
+            if(hash %in% names(.self$cache_data))
+                .self$cache_data[[hash]]
+            else
+                NA
+        #    ret = NA
+        #    if(check_disk)
+        #        {
+        #            dirs = c(.self$tmp_cache_dir, extra_dirs)
+        #            allcache_data = unlist(lapply(dirs, function(d) {
+        #                ret = list.dirs(d)
+        #                ret[grepl("cache", ret)]
+        #            }))
+        #            hasHash = grepl(hash, allcache_data)
+        #            if(any(hoasHash))
+        #                {
+        #                    ret = readCachedData(allcache_data[hasHash][1])
+        #                    .self$add_data(ret)
+        #                }
+        #        }
+        #    
+        #    ret
         },
         to_disk = function(dir, clear_mem)
         {
@@ -277,12 +274,21 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 sapply(cache_data, function(x) x$unload_mem())
         },
         #Want a way to only read in caches that aren't already in the set.
-        populate = function()
+        populate = function(refresh_existing = FALSE, load_data = FALSE)
         {
-            fils = list.files(.self$cache_dir)
-            cachefils = fils[grepl("cache_", fils)]
-            cds = lapply(cachefils, readCachedData)
+          #  fils = list.files(.self$cache_dir)
+           # cachefils = fils[grepl("cache_", fils)]
+            #cds = lapply(cachefils, readCachedata)
+            if(!file.exists(.self$cache_dir))
+                dir.create(.self$cache_dir, recursive=TRUE)
+            cds = readCachedData(.self$cache_dir, load_data = load_data)
             hshs = sapply(cds, function(x) x$inputs_hash)
+            if(!refresh_existing)
+                {
+                    inds = which(!(hshs %in% names(cache_data)))
+                    hshs = hshs[inds]
+                    cds = cds[inds]
+                }
             cache_data[hshs] <<- cds
         }
         
@@ -337,7 +343,7 @@ cachedData = setRefClass("CachedData",
         },
         unload_mem = function()
         {
-            rm(list = ls(envir = .data), env = .data)
+            rm(list = ls(envir = .data), envir = .data)
         },
         to_disk = function(tmp = FALSE, clear_mem = TRUE,force = FALSE, location)
         {
@@ -364,6 +370,8 @@ cachedData = setRefClass("CachedData",
                         location = .self$disk_location
                 }
             nams = ls(env = .data)
+            if(!file.exists(location))
+                dir.create(location, recursive=TRUE)
             save(list=nams, envir=.data, file = file.path(location, paste0(paste("cache",inputs_hash, sep="_"), ".rda")))
             if(clear_mem)
 #                rm(list = nams, envir = .data)

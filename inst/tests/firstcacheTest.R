@@ -2,7 +2,7 @@
 library(RCacheSuite)
 x = 5
 
-mycache = cacheClass$new(type="both", cache_dirs= "./")
+mycache = cacheClass$new( base_dir= "./")
 print(mycache)
 
 evalWithCache("y=x+5", cache = mycache, verbose=TRUE)
