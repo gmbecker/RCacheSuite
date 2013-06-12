@@ -5,6 +5,8 @@
 #knitr with cache=TRUE
 #SOAR package, not really the same thing, basically create lazyload dbs for things on the fly and take them out of memory?
 #cacher
+#memoize - Caches output of function call, immediately returns output if function is called again with same inputs. Not clear if it can track more than one set of inputs. I think it may actually modify the function itself akin to trace/debug
+
 
 parseEval = function(code, env, ...)
     {
