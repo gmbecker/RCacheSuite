@@ -31,7 +31,8 @@ cacheClass = setRefClass("CachingEngine",
                         }
                     .cache_sets <<- value
                 }
-        }),
+        },
+        gdevs = "list"),
     
     methods =  list(
         populate= function( dirs = c(.self$base_dir, .self$tmp_base_dir), hashes = NULL, refresh = FALSE, load_data = FALSE)
@@ -203,7 +204,9 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 .outputs
             else
                 .outputs <<- value
-        }),
+        },
+        gdevs = "list"
+        ),
     methods = list(
         find_data= function(hash, check_disk = TRUE, extra_dirs = NULL)
         {
@@ -318,6 +321,8 @@ cachedData = setRefClass("CachedData",
         tmp_disk_location = "character",
         .data = "environment",
         last_used = "ANY",
+        plot = "ANY",
+        gdevs = "list",
         file_stale = "logical"),
     methods = list(
         mem_size = function()
@@ -373,6 +378,15 @@ cachedData = setRefClass("CachedData",
             if(!file.exists(location))
                 dir.create(location, recursive=TRUE)
             save(list=nams, envir=.data, file = file.path(location, paste0(paste("cache",inputs_hash, sep="_"), ".rda")))
+            if(length(.data$xxx_graphics))
+                {
+                    mapply(function(ext, f)
+                           {
+                               f(file.path(location, paste0("plot_", inputs_hash, ".", ext)))
+                               redrawPlot(.data$xxx_graphics)
+                               dev.off()
+                           }, names(gdevs), gdevs)
+                }
             if(clear_mem)
 #                rm(list = nams, envir = .data)
                 .self$unload_mem()

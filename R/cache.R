@@ -7,6 +7,10 @@
 #cacher
 #memoize - Caches output of function call, immediately returns output if function is called again with same inputs. Not clear if it can track more than one set of inputs. I think it may actually modify the function itself akin to trace/debug
 
+#this is a list of classes we know correspond to plots, and whose show functions are assumed to draw the plot.
+#grobs (grid low level objects for image components) are drawn by default when they are created, but their show/print commands do NOT draw them, so they are excluded here
+gclasses = c("trellis", "ggplot", "gg", "ggbio", "recordedplot")
+
 
 parseEval = function(code, env, ...)
     {
@@ -14,75 +18,9 @@ parseEval = function(code, env, ...)
     }
 
 
-##Old Version, New version below uses cache classes and supports in memory and on disk caching
-if(FALSE)
-    {
-evalWithCache = function(code, codeInfo, inputvars, outputvars, cachedir = "./", evaluator = function(x) parseEval(x, envir), clearStaleCache = FALSE, verbose = FALSE, envir = .GlobalEnv, ...)
-  {
-    if(missing(inputvars)||missing(outputvars))
-      {
-        if(missing(codeInfo))
-          {
-            code2 = paste("{", code, "}", collapse="\n")
-            #hack to get CodeDepends to treat the code as a single block...
-            #if(!(grepl("\\{", code2)[1] && grepl("\\}", code2)[length(code2)]))
-             # code2 = paste("{", code2, "}", collapse="\n")
-
-            scr = readScript("", type="R", txt=code2)
-            codeInfo = getInputs(scr)[[1]]
-          }
-        inputvars = codeInfo@inputs
-        outputvars = codeInfo@outputs
-       
-      }
-
-    #parse and deparse the code to get rid of the annoying "adding a space invalidates the cache" issue other systems have
-    pcode = deparse(parse(text=code, keep.source=FALSE))
-
-    #do the required inputs even exist in the current session?
-    in_exist = sapply(inputvars, exists)
-    if(!all(in_exist))
-      stop(paste("Missing variable(s) required to evaluate codeblock:", inputvars[!in_exist], collapse = " "))
-    
-    musteval = TRUE
-    #make the list we will digest to get the hash. It includes the (properly handled) code as well as the current values of all the input variables
-    diglist = c(pcode, lapply(inputvars, get))
-    hash = digest(diglist)
-    hashdir = file.path(cachedir, paste("cache", hash, sep="_"))
-    if(file.exists(hashdir))
-      {
-        if(verbose)
-          cat(paste0("\nMatching cache found for hash:\n\t", hash, "\n\tLoading previously cached results.\n"))
-
-        load(file.path(hashdir, paste0(hash, ".rda")))
-        musteval = FALSE
-        
-      }
-  
-    if(musteval)
-      {
-        if(verbose)
-          cat(paste0("\nNo matching cache found for hash:\n\t", hash, "\n"))
-        xxx_returnvalue = evaluator(code, ...)
-        outlist = c("xxx_returnvalue", outputvars, "pcode")
-        dir.create(hashdir)
-        save(list = outlist, file = file.path(hashdir, paste0(hash, ".rda")))
-      }
-        
-    
-    if(musteval && clearStaleCache)
-      {
-        #code to delete old cache goes here
-        NULL
-      }
-    return(xxx_returnvalue)
-  }
-
-}
-
 #because we don't return it, the cache MUST already exist!
 #Actually, I guess if we didn't, it could just write the cache to disk as it is released, reproducing behavior of other caching systems
-evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator = parseEval, env = .GlobalEnv, verbose = FALSE, force = FALSE, ...)
+evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator = parseEval, env = .GlobalEnv, verbose = FALSE, force = FALSE, gexts = "png", gdev = sapply(gexts, function(nm) get(nm, mode="function")), ...)
     {
 
         if(missing(inputVars)||missing(outputVars))
@@ -124,18 +62,44 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
                     cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
                 fnd$retrieve_data(env)
                 xxx_returnvalue = get("xxx_returnvalue", env)
+                if(length(env$xxx_graphics))
+                  #  replayPlot(env$xxx_graphics)
+                    redrawPlot(env$xxx_graphics)
             } else {
                 if(verbose)
                     cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
                 
+                oldplot = if(dev.cur() > 1) recordPlot() else NULL
+                olddev = dev.cur()
                 xxx_returnvalue = evaluator(code, env,  ...)
-                outlist = c("xxx_returnvalue", outputVars, "pcode")
-                #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
+                assign("xxx_returnvalue", xxx_returnvalue, env = env)
+                xxx_graphics = NULL
+                                        #If the return value is a class we know is a plot, show it
+                if(any(sapply(gclasses, function(cl) is(xxx_returnvalue, cl))))
+                    show(xxx_returnvalue)
+                #check if there an active graphics device and if so if its contents are different than
+                #the contents
+                # Hadley's evaluate package does a more sophisticated version of this check, but do we want to depend on it just for that?
+                newdev = dev.cur()
+                if(newdev > 1 && (is.null(oldplot) || newdev != olddev || ! identical(oldplot, recordPlot() ) ) )
+                    xxx_graphics = recordPlot()
+                
+                assign("xxx_graphics", xxx_graphics, env)
+                
+                                        # assign("pcode", pcode, env = env)
+               # outlist = c("xxx_returnvalue", outputVars, "pcode")
+                #XXX why did I think i needed the pcode value? Am I using it somehwere?
+                outlist = c("xxx_returnvalue", outputVars)
+                if(length(xxx_graphics))
+                    outlist = c(outlist, "xxx_graphics")
+                
+                if(!is.list(gdev))
+                    gdev = list(gext = gdev)
                 cset = cache$get_or_create_set(pcode, inputVars, outputVars)
-                newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE)
+                                        #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
+                newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE, plot = xxx_graphics, gdevs = gdev)
                 for(o in outlist)
-                    assign(o, get(o), newcd$.data)
-               # cache$add_data(newcd)
+                    assign(o, get(o, env = env), newcd$.data)
                 cset$add_data(newcd)
             }
         return(xxx_returnvalue)
