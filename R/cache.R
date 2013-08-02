@@ -20,8 +20,30 @@ parseEval = function(code, env, ...)
 
 #because we don't return it, the cache MUST already exist!
 #Actually, I guess if we didn't, it could just write the cache to disk as it is released, reproducing behavior of other caching systems
-evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator = parseEval, env = .GlobalEnv, verbose = FALSE, force = FALSE, gexts = "png", gdev = sapply(gexts, function(nm) get(nm, mode="function")), ...)
+evalWithCache = function(
+    code,
+    codeInfo,
+    inputVars,
+    outputVars,
+    cache,
+    evaluator = parseEval,
+    env = .GlobalEnv,
+    verbose = FALSE,
+    force = FALSE,
+    gexts = "png",
+    gdev = sapply(gexts, function(nm) get(nm, mode="function")),
+    showRetVal = FALSE,
+    cacheRand = FALSE,
+    ...)
     {
+        if(length(code) > 1)
+            {
+                if(all(grepl("\\n", code[-length(code)])))
+                    code = paste(code, collapse="")
+                else
+                    code = paste(code, collapse="\n")
+            }
+
 
         if(missing(inputVars)||missing(outputVars))
             {
@@ -29,9 +51,7 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
                     {
                         code2 = paste("{", code, "}", collapse="\n")
                                         #hack to get CodeDepends to treat the code as a single block...
-                                        #if(!(grepl("\\{", code2)[1] && grepl("\\}", code2)[length(code2)]))
-                                        # code2 = paste("{", code2, "}", collapse="\n")
-                        
+                                
                         scr = readScript("", type="R", txt=code2)
                         codeInfo = getInputs(scr)[[1]]
                     }
@@ -62,12 +82,21 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
                     cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
                 fnd$retrieve_data(env)
                 xxx_returnvalue = get("xxx_returnvalue", env)
+
                 if(length(env$xxx_graphics))
                   #  replayPlot(env$xxx_graphics)
                     redrawPlot(env$xxx_graphics)
+                #XXX What if we ever WANT to print NULL???
+                #we exclude gclasses because the above redraw will take care of it. Don't need to show it twice.
+                if(showRetVal && !is.null(xxx_returnvalue) && !class(xxx_returnvalue) %in% gclasses)
+                    show(xxx_returnvalue)
             } else {
                 if(verbose)
                     cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
+                if(exists(".Random.seed"))
+                    oldRS = .Random.seed
+                else
+                    oldRS = NULL
                 
                 oldplot = if(dev.cur() > 1) recordPlot() else NULL
                 olddev = dev.cur()
@@ -95,12 +124,24 @@ evalWithCache = function(code, codeInfo, inputVars, outputVars, cache, evaluator
                 
                 if(!is.list(gdev))
                     gdev = list(gext = gdev)
-                cset = cache$get_or_create_set(pcode, inputVars, outputVars)
+
+                #XXX This won't catch everything, but it will catch a lot.
+                #See note/details in ?set.seed
+                rand = FALSE
+                if(exists(".Random.seed") && ! identical(oldRS, .Random.seed))
+                    rand = TRUE
+                #What should we do when we know the result is random?
+                #Cache it with information on the object indicating its random, or not cache at all?
+                #we can control this with an argument but still need to decide the default...
+                if(!rand || cacheRand )
+                    {
+                        cset = cache$get_or_create_set(pcode, inputVars, outputVars)
                                         #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
-                newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE, plot = xxx_graphics, gdevs = gdev)
-                for(o in outlist)
-                    assign(o, get(o, env = env), newcd$.data)
-                cset$add_data(newcd)
+                        newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE, plot = xxx_graphics, gdevs = gdev)
+                        for(o in outlist)
+                            assign(o, get(o, env = env), newcd$.data)
+                        cset$add_data(newcd)
+                    }
             }
         return(xxx_returnvalue)
     }

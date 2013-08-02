@@ -247,7 +247,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
                       "## Do Not Edit ##",
                       sprintf("## Hash: %s ##", .self$hash),
                       "##################################################",
-                      .self$code, sep="\n"),
+                      paste(.self$code, collapse="\n"), sep="\n"),
                       file = file.path(dir, "code.R"))
         },
         add_data = function(dat)
