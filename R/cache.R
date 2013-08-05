@@ -17,6 +17,15 @@ parseEval = function(code, env, ...)
         eval(parse(text = code), envir=env)
     }
 
+parseEval2 = function(code, env, ...)
+    {
+        pcode = parse(text=code)
+        res = withVisible(eval(pcode, envir = env))
+        ret = res$value
+        if(res$visible)
+            show(ret)
+        invisible(ret) #if it needed to be shown we already did, so we return it invisibly
+    }
 
 #because we don't return it, the cache MUST already exist!
 #Actually, I guess if we didn't, it could just write the cache to disk as it is released, reproducing behavior of other caching systems
@@ -82,14 +91,16 @@ evalWithCache = function(
                     cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
                 fnd$retrieve_data(env)
                 xxx_returnvalue = get("xxx_returnvalue", env)
+                if(env$xxx_retvisible)
+                    show(xxx_returnvalue)
 
                 if(length(env$xxx_graphics))
                   #  replayPlot(env$xxx_graphics)
                     redrawPlot(env$xxx_graphics)
                 #XXX What if we ever WANT to print NULL???
                 #we exclude gclasses because the above redraw will take care of it. Don't need to show it twice.
-                if(showRetVal && !is.null(xxx_returnvalue) && !class(xxx_returnvalue) %in% gclasses)
-                    show(xxx_returnvalue)
+               # if(showRetVal && !is.null(xxx_returnvalue) && !class(xxx_returnvalue) %in% gclasses)
+                #    show(xxx_returnvalue)
             } else {
                 if(verbose)
                     cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
@@ -100,12 +111,20 @@ evalWithCache = function(
                 
                 oldplot = if(dev.cur() > 1) recordPlot() else NULL
                 olddev = dev.cur()
-                xxx_returnvalue = evaluator(code, env,  ...)
+                ret = withVisible(evaluator(code, env,  ...))
+                xxx_retvis = ret$visible
+                if(ret$visible)
+                    show(ret$value)
+                xxx_returnvalue = ret$value
+                xxx_retvisible = ret$visible
+                         
                 assign("xxx_returnvalue", xxx_returnvalue, env = env)
+                assign("xxx_retvisible", xxx_retvisible, env = env)
                 xxx_graphics = NULL
-                                        #If the return value is a class we know is a plot, show it
-                if(any(sapply(gclasses, function(cl) is(xxx_returnvalue, cl))))
-                    show(xxx_returnvalue)
+                                        #If the return value is a class we know is a plot, show it.
+                #I am pretty sure this is now taken care of with the ret$visible check.
+              #  if(any(sapply(gclasses, function(cl) is(xxx_returnvalue, cl))))
+               #     show(xxx_returnvalue)
                 #check if there an active graphics device and if so if its contents are different than
                 #the contents
                 # Hadley's evaluate package does a more sophisticated version of this check, but do we want to depend on it just for that?
@@ -118,7 +137,7 @@ evalWithCache = function(
                                         # assign("pcode", pcode, env = env)
                # outlist = c("xxx_returnvalue", outputVars, "pcode")
                 #XXX why did I think i needed the pcode value? Am I using it somehwere?
-                outlist = c("xxx_returnvalue", outputVars)
+                outlist = c("xxx_returnvalue", "xxx_retvisible",  outputVars)
                 if(length(xxx_graphics))
                     outlist = c(outlist, "xxx_graphics")
                 
@@ -143,5 +162,5 @@ evalWithCache = function(
                         cset$add_data(newcd)
                     }
             }
-        return(xxx_returnvalue)
+        invisible(xxx_returnvalue)
     }
