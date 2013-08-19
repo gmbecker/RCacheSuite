@@ -240,7 +240,9 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 dir = .self$cache_dir
             if(is.na(dir))
                 stop("No directory to write to specified and no default location is available")
-            
+
+            if(!file.exists(dir))
+                dir.create(dir, recursive=TRUE)
             sapply(.self$cache_data, function(x) x$to_disk(location = dir, clear_mem = clear_mem))
             cat(paste("##################################################",
                       "## This file was automatically generated for provenance purposes ##",
@@ -279,11 +281,9 @@ codeCacheSet = setRefClass("CodeCacheSet",
         #Want a way to only read in caches that aren't already in the set.
         populate = function(refresh_existing = FALSE, load_data = FALSE)
         {
-          #  fils = list.files(.self$cache_dir)
-           # cachefils = fils[grepl("cache_", fils)]
-            #cds = lapply(cachefils, readCachedata)
-            if(!file.exists(.self$cache_dir))
-                dir.create(.self$cache_dir, recursive=TRUE)
+     
+          #  if(!file.exists(.self$cache_dir))
+           #     dir.create(.self$cache_dir, recursive=TRUE)
             cds = readCachedData(.self$cache_dir, load_data = load_data)
             hshs = sapply(cds, function(x) x$inputs_hash)
             if(!refresh_existing)

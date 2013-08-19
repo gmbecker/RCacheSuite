@@ -3,7 +3,7 @@ Version: 0.0-1
 Title: Dependency-Aware Caching
 Description: A suite of in-memory and on-disk caching mechanisms which can take into account both code content and the value(s) of any input variables the code uses
 Author: Gabriel Becker
-Depends: methods, CodeDepends, digest
+Depends: methods, CodeDepends (>= 0.3-5), digest
 Suggests:  RUnit 
 Maintainer: Gabriel Becker <gmbecker@ucdavis.edu>
 License: GPL

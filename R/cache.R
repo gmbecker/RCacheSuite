@@ -12,10 +12,9 @@
 gclasses = c("trellis", "ggplot", "gg", "ggbio", "recordedplot")
 
 
-parseEval = function(code, env, ...)
-    {
-        eval(parse(text = code), envir=env)
-    }
+parseEval = function(code, env, ...) eval(parse(text=code), env=env)
+
+parseWithVis = function(code, env, ...) withVisible(eval(parse(text=code), env= env))
 
 parseEval2 = function(code, env, ...)
     {
@@ -27,6 +26,16 @@ parseEval2 = function(code, env, ...)
         invisible(ret) #if it needed to be shown we already did, so we return it invisibly
     }
 
+withVisHandler = function(val, graphics)
+    {
+        if(length(graphics))
+            redrawPlot(graphics)
+        if(val$visible)
+            show(val$value)
+        val$value
+    }
+
+
 #because we don't return it, the cache MUST already exist!
 #Actually, I guess if we didn't, it could just write the cache to disk as it is released, reproducing behavior of other caching systems
 evalWithCache = function(
@@ -35,13 +44,15 @@ evalWithCache = function(
     inputVars,
     outputVars,
     cache,
-    evaluator = parseEval,
+    evaluator = parseWithVis,
     env = .GlobalEnv,
+    #handleReturn is intended to reproduce side-effects such as error/warning messages, prints to R console, drawing to graphics devices, etc
+    #It could be used to format output, but that is not its intention and that task is better pursued once evalWithCache has returned.
+    handleReturn = withVisHandler,
     verbose = FALSE,
     force = FALSE,
     gexts = "png",
     gdev = sapply(gexts, function(nm) get(nm, mode="function")),
-    showRetVal = FALSE,
     cacheRand = FALSE,
     ...)
     {
@@ -91,16 +102,16 @@ evalWithCache = function(
                     cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
                 fnd$retrieve_data(env)
                 xxx_returnvalue = get("xxx_returnvalue", env)
-                if(env$xxx_retvisible)
-                    show(xxx_returnvalue)
-
-                if(length(env$xxx_graphics))
-                  #  replayPlot(env$xxx_graphics)
-                    redrawPlot(env$xxx_graphics)
-                #XXX What if we ever WANT to print NULL???
-                #we exclude gclasses because the above redraw will take care of it. Don't need to show it twice.
-               # if(showRetVal && !is.null(xxx_returnvalue) && !class(xxx_returnvalue) %in% gclasses)
-                #    show(xxx_returnvalue)
+                #The handler handles side effects such as printing, graphics are handled separately below
+                #is there a way to handle graphics in the handle
+                if(!is.null(env$xxx_handler))
+                    xxx_returnvalue = env$xxx_handler(xxx_returnvalue, env$xxx_graphics)
+                else
+                    {
+                        if(length(env$xxx_graphics))
+                                        #  replayPlot(env$xxx_graphics)
+                            redrawPlot(env$xxx_graphics)
+                    }
             } else {
                 if(verbose)
                     cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
