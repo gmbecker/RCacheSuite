@@ -32,7 +32,42 @@ cacheClass = setRefClass("CachingEngine",
                     .cache_sets <<- value
                 }
         },
-        gdevs = "list"),
+        gdevs = "list",
+        .write_on_cache = "logical",
+        write_on_cache = function(value)
+        {
+            if(missing(value))
+                .write_on_cache
+            else
+                .write_on_cache <<- value
+        },
+        .eval_fun = "function",
+        eval_fun = function(value)
+        {
+            if(missing(value))
+                .eval_fun
+            else
+                {
+                    if(!all(c("code", "env", "...") %in% names(formals(value))))
+                        stop("eval function has incompatible signature. Must accept arguments 'code', 'env', and '...'")
+                    .eval_fun <<- value
+                }
+        },
+        .return_handler = "function",
+        return_handler = function(value)
+        {
+            if(missing(value))
+                .return_handler
+            else
+                {
+                    if(!all(c("val", "graphics", "...") %in% names(formals(value))))
+                        stop("return handler function has incorrect signature. Must accept arguments 'val', 'graphics', and '...'")
+                    else
+                        .return_handler <<- value
+                }
+        }
+        
+        ),
     
     methods =  list(
         populate= function( dirs = c(.self$base_dir, .self$tmp_base_dir), hashes = NULL, refresh = FALSE, load_data = FALSE)
@@ -40,13 +75,14 @@ cacheClass = setRefClass("CachingEngine",
             for(d in dirs)
                 {
                     fils = list.dirs(d)
-              #      fils = fils[grepl("cache", fils)]
                     fils = fils[grepl("code_", fils)]
                     if(!is.null(hashes))
                         fils = fils[grepl(paste0("(", paste(hashes, collapse = "|"), ")"), fils)]
                     
-                   #newcdata = lapply(fils, readCachedData, load_data= load_data)
                     newcachesets = lapply(fils, readCodeCache, load_data = load_data)
+                    if(is(newcachesets, "list"))
+                        newcachesets = newcachesets[!sapply(newcachesets, is.null)]
+                    
                     newhashes = sapply(newcachesets, function(x) x$hash)
                     if(!refresh)
                         {
@@ -55,24 +91,34 @@ cacheClass = setRefClass("CachingEngine",
                             newcachesets = newcachesets[new]
                             newhashes = newhashes[new]
                         }
-                    
-                    .cache_sets[newhashes] <<-  newcachesets
+                    if(length(newhashes))
+                        .cache_sets[newhashes] <<-  newcachesets
                 }
         },
         add_set = function(newset)
         {
             .cache_sets[[newset$hash]] <<- newset
+            if(.self$write_on_cache)
+                .cache_sets[[newset$hash]]$to_disk()
+            newset
         },
         add_data = function(newdat)
         {
             chash = newdat$code_hash
             if(chash %in% names(.cache_sets))
-                .cache_sets[[chash]]$add_data(newdat)
-            else
+                {
+                    .cache_sets[[chash]]$add_data(newdat)
+                    #if we are adding an entirely new set, this is taken care of by that. ugly I know but we don't want to write to disk twice....
+                    if(.self$write_on_cache)
+                        .cache_sets[[chash]]$to_disk()
+                }
+           else
                 {
                     newset = new("CodeCacheSet", hash = chash, cache_dir = file.path(.self$base_dir, sprintf("code_%s", chash)))
-                    
+                    .self$add_set(newset)
                 }
+ 
+            .cache_sets[[chash]]
         },
         get_or_create_set = function(code, inputs = NULL, outputs = NULL)
         {
@@ -104,7 +150,8 @@ cacheClass = setRefClass("CachingEngine",
                         hash = chash,
                         cache_dir = file.path(.self$base_dir, sprintf("code_%s", chash)),
                         inputs = inputs,
-                        outputs = outputs)
+                        outputs = outputs,
+                        write_on_cache = .self$write_on_cache)
                     .self$add_set(newset)
                     newset
                 }
@@ -136,6 +183,13 @@ cacheClass = setRefClass("CachingEngine",
         
         )
     )
+
+cachingEngine = function(base_dir="./r_caches", tmp_base_dir = tempdir(),
+    write_on_cache = FALSE, gdevs = list(png), eval_fun = parseWithVis, return_handler = withVisHandler, populate = TRUE)
+    {
+        engine = cacheClass(base_dir = base_dir, tmp_base_dir = tmp_base_dir, write_on_cache = write_on_cache, gdevs = gdevs, eval_fun = eval_fun, return_handler = return_handler, populate = populate)
+        engine
+    }
 
 
 codeCacheSet = setRefClass("CodeCacheSet",
@@ -205,7 +259,8 @@ codeCacheSet = setRefClass("CodeCacheSet",
             else
                 .outputs <<- value
         },
-        gdevs = "list"
+        gdevs = "list",
+        write_on_cache = "logical"
         ),
     methods = list(
         find_data= function(hash, check_disk = TRUE, extra_dirs = NULL)
@@ -216,23 +271,6 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 .self$cache_data[[hash]]
             else
                 NA
-        #    ret = NA
-        #    if(check_disk)
-        #        {
-        #            dirs = c(.self$tmp_cache_dir, extra_dirs)
-        #            allcache_data = unlist(lapply(dirs, function(d) {
-        #                ret = list.dirs(d)
-        #                ret[grepl("cache", ret)]
-        #            }))
-        #            hasHash = grepl(hash, allcache_data)
-        #            if(any(hoasHash))
-        #                {
-        #                    ret = readCachedData(allcache_data[hasHash][1])
-        #                    .self$add_data(ret)
-        #                }
-        #        }
-        #    
-        #    ret
         },
         to_disk = function(dir, clear_mem)
         {
@@ -255,6 +293,9 @@ codeCacheSet = setRefClass("CodeCacheSet",
         add_data = function(dat)
         {
             cache_data[[dat$inputs_hash]] <<- dat
+            if(.self$write_on_cache)
+                cache_data[[dat$inputs_hash]]$to_disk(clear_mem = FALSE)
+            dat
         },
         mem_size = function()
         {
@@ -360,13 +401,13 @@ cachedData = setRefClass("CachedData",
                 {
                     if(tmp)
                         {
-                            if(length(disk_location))
-                                warning(sprintf("Modifying disk location of existing cache for hash %s", inputs_hash))
-                            .self$disk_location = location
-                        } else {
-                            if(length(tmp_disk_location))
-                                warning(sprintf("Modifying tmp disk location of existing cache for hash %s", inputs_hash))
+                            if(length(tmp_disk_location) && !identical(tmp_disk_location, location))
+                                warning(sprintf("Modifying tmp disk location of existing cache for hash %s from %s to %s", inputs_hash, tmp_disk_location, location))
                             .self$tmp_disk_location = location
+                        } else {
+                            if(length(disk_location) && !identical(disk_location, location))
+                                warning(sprintf("Modifying disk location of existing cache for hash %s from %s to %s", inputs_hash, disk_location, location))
+                            .self$disk_location = location
                         }
                 } else {
                     if(tmp)

@@ -26,9 +26,9 @@ parseEval2 = function(code, env, ...)
         invisible(ret) #if it needed to be shown we already did, so we return it invisibly
     }
 
-withVisHandler = function(val, graphics)
+withVisHandler = function(val, graphics, evaled = FALSE, ...)
     {
-        if(length(graphics))
+        if(length(graphics) && !evaled)
             redrawPlot(graphics)
         if(val$visible)
             show(val$value)
@@ -43,17 +43,17 @@ evalWithCache = function(
     codeInfo,
     inputVars,
     outputVars,
-    cache,
-    evaluator = parseWithVis,
+    #The default here is write_on_cache=TRUE because we don't return the cache engine so if it isn't passed in its not retained anywhere;.
+    #This replicates existing caching behaviors where the only caching actions are one-time read from/write to disk.
+    #Passing in an existing CachingEngine objects modifies that object in place and gives access to the full spectrum of caching behaviors offered by the package.
+    cache = cachingEngine(write_on_cache = TRUE),
     env = .GlobalEnv,
-    #handleReturn is intended to reproduce side-effects such as error/warning messages, prints to R console, drawing to graphics devices, etc
-    #It could be used to format output, but that is not its intention and that task is better pursued once evalWithCache has returned.
-    handleReturn = withVisHandler,
-    verbose = FALSE,
     force = FALSE,
+    cacheRand = FALSE,
+    verbose = FALSE,
     gexts = "png",
     gdev = sapply(gexts, function(nm) get(nm, mode="function")),
-    cacheRand = FALSE,
+
     ...)
     {
         if(length(code) > 1)
@@ -85,7 +85,7 @@ evalWithCache = function(
       #  pcode = sapply(parse(text=code, keep.source=FALSE), deparse)
         pcode = unparse(parse(text=code, keep.source=FALSE))
     #do the required inputs even exist in the current session?
-        in_exist = sapply(inputVars, exists)
+        in_exist = sapply(inputVars, exists, envir = env)
         if(!all(in_exist))
             stop(paste("Missing variable(s) required to evaluate codeblock:", inputVars[!in_exist], collapse = " "))
         
@@ -93,7 +93,7 @@ evalWithCache = function(
         #diglist = c(pcode, lapply(inputVars, get))
 #        chash = digest(sapply(pcode, deparse))
         chash = digest(pcode)
-        ihash = digest(lapply(inputVars, get))
+        ihash = digest(lapply(inputVars, get, envir = env))
 
         fnd = cache$find_data(chash, ihash)
         if(is(fnd, "CachedData") && !force)
@@ -102,10 +102,9 @@ evalWithCache = function(
                     cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
                 fnd$retrieve_data(env)
                 xxx_returnvalue = get("xxx_returnvalue", env)
-                #The handler handles side effects such as printing, graphics are handled separately below
-                #is there a way to handle graphics in the handle
+                #The handler handles side effects such as printing, warning/error message, and graphcis.
                 if(!is.null(env$xxx_handler))
-                    xxx_returnvalue = env$xxx_handler(xxx_returnvalue, env$xxx_graphics)
+                    returnvalue = env$xxx_handler(xxx_returnvalue, env$xxx_graphics, evaled = FALSE)
                 else
                     {
                         if(length(env$xxx_graphics))
@@ -122,20 +121,12 @@ evalWithCache = function(
                 
                 oldplot = if(dev.cur() > 1) recordPlot() else NULL
                 olddev = dev.cur()
-                ret = withVisible(evaluator(code, env,  ...))
-                xxx_retvis = ret$visible
-                if(ret$visible)
-                    show(ret$value)
-                xxx_returnvalue = ret$value
-                xxx_retvisible = ret$visible
-                         
+
+                xxx_returnvalue = cache$eval_fun(code = code, env = env, ...)
+                                         
                 assign("xxx_returnvalue", xxx_returnvalue, env = env)
-                assign("xxx_retvisible", xxx_retvisible, env = env)
+                assign("xxx_handler", cache$return_handler, env = env)
                 xxx_graphics = NULL
-                                        #If the return value is a class we know is a plot, show it.
-                #I am pretty sure this is now taken care of with the ret$visible check.
-              #  if(any(sapply(gclasses, function(cl) is(xxx_returnvalue, cl))))
-               #     show(xxx_returnvalue)
                 #check if there an active graphics device and if so if its contents are different than
                 #the contents
                 # Hadley's evaluate package does a more sophisticated version of this check, but do we want to depend on it just for that?
@@ -145,10 +136,8 @@ evalWithCache = function(
                 
                 assign("xxx_graphics", xxx_graphics, env)
                 
-                                        # assign("pcode", pcode, env = env)
-               # outlist = c("xxx_returnvalue", outputVars, "pcode")
-                #XXX why did I think i needed the pcode value? Am I using it somehwere?
-                outlist = c("xxx_returnvalue", "xxx_retvisible",  outputVars)
+                #XXX previously outlist included pcode. why did I think i needed the pcode value? Am I using it somehwere?
+                outlist = c("xxx_returnvalue", "xxx_handler",  outputVars)
                 if(length(xxx_graphics))
                     outlist = c(outlist, "xxx_graphics")
                 
@@ -172,6 +161,9 @@ evalWithCache = function(
                             assign(o, get(o, env = env), newcd$.data)
                         cset$add_data(newcd)
                     }
+                # this is probably going to duplicate side-effects which occur during the actual evaluation process??
+                # Add a mandatory evaled argument and leave it up to the handler to know what to recreate
+                returnvalue = cache$return_handler(xxx_returnvalue, xxx_graphics, evaled = TRUE)
             }
-        invisible(xxx_returnvalue)
+        invisible(returnvalue)
     }
