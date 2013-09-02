@@ -1,7 +1,7 @@
 library(RCacheSuite)
 x = 5
 
-mycache = cacheClass$new( base_dir= "./")
+mycache = cachingEngine()
 
 evalWithCache("plot(1:x)", cache = mycache, verbose = TRUE)
 

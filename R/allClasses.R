@@ -33,13 +33,39 @@ cacheClass = setRefClass("CachingEngine",
                 }
         },
         gdevs = "list",
+        .write_allowed = "logical",
+        write_allowed = function(value)
+        {
+            if(missing(value))
+                .write_allowed
+            else
+            {
+                if(is.na(value))
+                {
+                    warning("NAs not allowed for write_allowed field of CachingEngine objects, interpreting as TRUE")
+                    value = TRUE
+                }
+                .write_allowed <<- value
+                if(!.write_allowed)
+                    sapply(.cache_set, function(x) x$write_allowed = FALSE)
+            }
+        },      
         .write_on_cache = "logical",
         write_on_cache = function(value)
         {
             if(missing(value))
                 .write_on_cache
             else
+            {
+                if(is.na(value))
+                {
+                    warning("NAs not allowed for write_on_cache field of CachingEngine objects, interpeting as FALSE")
+                    value = FALSE
+                }
                 .write_on_cache <<- value
+                sync_permissions(.self, .self$cache_sets)
+                value
+            }
         },
         .eval_fun = "function",
         eval_fun = function(value)
@@ -60,8 +86,8 @@ cacheClass = setRefClass("CachingEngine",
                 .return_handler
             else
                 {
-                    if(!all(c("val", "graphics", "...") %in% names(formals(value))))
-                        stop("return handler function has incorrect signature. Must accept arguments 'val', 'graphics', and '...'")
+                    if(!all(c("val", "graphics", "env", "...") %in% names(formals(value))))
+                        stop("return handler function has incorrect signature. Must accept arguments 'val', 'graphics', 'env', and '...'")
                     else
                         .return_handler <<- value
                 }
@@ -79,7 +105,7 @@ cacheClass = setRefClass("CachingEngine",
                     if(!is.null(hashes))
                         fils = fils[grepl(paste0("(", paste(hashes, collapse = "|"), ")"), fils)]
                     
-                    newcachesets = lapply(fils, readCodeCache, load_data = load_data)
+                    newcachesets = lapply(fils, readCodeCache, load_data = load_data, write_allowed = write_allowed)
                     if(is(newcachesets, "list"))
                         newcachesets = newcachesets[!sapply(newcachesets, is.null)]
                     
@@ -97,9 +123,14 @@ cacheClass = setRefClass("CachingEngine",
         },
         add_set = function(newset)
         {
+           if(!write_allowed)
+                newset$write_allowed <- FALSE
+           else if (!length(newset$write_allowed))
+               newset$write_allowed = write_allowed
             .cache_sets[[newset$hash]] <<- newset
             if(.self$write_on_cache)
                 .cache_sets[[newset$hash]]$to_disk()
+ 
             newset
         },
         add_data = function(newdat)
@@ -107,14 +138,20 @@ cacheClass = setRefClass("CachingEngine",
             chash = newdat$code_hash
             if(chash %in% names(.cache_sets))
                 {
+                    #caches and code-level cache sets can be more permissive but not less permissive than the CachingEngine
+                    if(!write_allowed)
+                        newdat$write_allowed = FALSE
+                    else
+                        newdat$write_allowed = .cache_sets[[chash]]$write_allowed
                     .cache_sets[[chash]]$add_data(newdat)
+                        
                     #if we are adding an entirely new set, this is taken care of by that. ugly I know but we don't want to write to disk twice....
                     if(.self$write_on_cache)
-                        .cache_sets[[chash]]$to_disk()
+                        .cache_sets[[chash]][[newdata$inputs_hash]]$to_disk()
                 }
            else
                 {
-                    newset = new("CodeCacheSet", hash = chash, cache_dir = file.path(.self$base_dir, sprintf("code_%s", chash)))
+                    newset = new("CodeCacheSet", hash = chash, cache_dir = file.path(.self$base_dir, sprintf("code_%s", chash)), write_allowed = write_allowed)
                     .self$add_set(newset)
                 }
  
@@ -122,15 +159,10 @@ cacheClass = setRefClass("CachingEngine",
         },
         get_or_create_set = function(code, inputs = NULL, outputs = NULL)
         {
-        
-                        
             if(is.null(inputs)|| is.null(outputs))
                 {
                     code2 = paste("{", code, "}", collapse="\n")
                     #hack to get CodeDepends to treat the code as a single block...
-                    #if(!(grepl("\\{", code2)[1] && grepl("\\}", code2)[length(code2)]))
-                    # code2 = paste("{", code2, "}", collapse="\n")
-                        
                     scr = readScript("", type="R", txt=code2)
                     codeInfo = getInputs(scr)[[1]]
                     
@@ -139,7 +171,7 @@ cacheClass = setRefClass("CachingEngine",
                 }
             pcode = unparse(parse(text=code, keep.source=FALSE))
             if(!identical(pcode, code))
-                warning("unparse(parse(code)) and code are not identical. This could potentially cause a hash mismatch. Perhaps unparsed code was passed into get_or_create_set?")
+                warning("unparse(parse(code)) and code are not identical. This could potentially cause a hash mismatch. Perhaps unparsed code was passed into get_or_create_set (this should not happen)?")
             chash = digest(pcode)
             if(chash %in% names(cache_sets))
                 cache_sets[[chash]]
@@ -151,7 +183,8 @@ cacheClass = setRefClass("CachingEngine",
                         cache_dir = file.path(.self$base_dir, sprintf("code_%s", chash)),
                         inputs = inputs,
                         outputs = outputs,
-                        write_on_cache = .self$write_on_cache)
+                        write_on_cache = .self$write_on_cache,
+                        write_allowed = .self$write_allowed)
                     .self$add_set(newset)
                     newset
                 }
@@ -172,12 +205,13 @@ cacheClass = setRefClass("CachingEngine",
         },
         to_disk = function(clear_mem = TRUE, tmp=FALSE)
         {
-            if(!tmp)
-                dir = .self$base_dir
-            else
-                dir = .self$tmp_base_dir
+            if(!write_allowed)
+                stop("Attempted to write to disk on a CachingEngine which has writing disabled (writing_allowed is FALSE)")
+  #          if(!tmp)
+  #              dir = .self$base_dir
+  #          else
+  #              dir = .self$tmp_base_dir
             
-        #    invisible(sapply(cache_sets, function(x, dir, clr) x$to_disk(dir, clr), dir = dir, clr = clear_mem))
             invisible(sapply(cache_sets, function(x, clr) x$to_disk(clear_mem= clr), clr = clear_mem))
         }
         
@@ -185,9 +219,9 @@ cacheClass = setRefClass("CachingEngine",
     )
 
 cachingEngine = function(base_dir="./r_caches", tmp_base_dir = tempdir(),
-    write_on_cache = FALSE, gdevs = list(png), eval_fun = parseWithVis, return_handler = withVisHandler, populate = TRUE)
+    write_allowed = TRUE, write_on_cache = FALSE, gdevs = list(png), eval_fun = parseWithVis, return_handler = withVisHandler, populate = TRUE)
     {
-        engine = cacheClass(base_dir = base_dir, tmp_base_dir = tmp_base_dir, write_on_cache = write_on_cache, gdevs = gdevs, eval_fun = eval_fun, return_handler = return_handler, populate = populate)
+        engine = cacheClass(base_dir = base_dir, tmp_base_dir = tmp_base_dir, write_allowed = write_allowed, write_on_cache = write_on_cache, gdevs = gdevs, eval_fun = eval_fun, return_handler = return_handler, populate = populate)
         engine
     }
 
@@ -225,6 +259,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
                             names(value) = hsh
                         }
                     .cache_data <<- value
+                    sync_permissions(.self, .cache_data)
                 }
         },
         .tmp_cache_dir = "character",
@@ -260,8 +295,41 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 .outputs <<- value
         },
         gdevs = "list",
-        write_on_cache = "logical"
-        ),
+       .write_allowed = "logical",
+        write_allowed = function(value)
+        {
+            if(missing(value))
+                .write_allowed
+            else
+            {
+                if(is.na(value))
+                {
+                    warning("NAs not allowed for write_allowed field of CodeCacheSet objects, interpreting as TRUE")
+                    value = TRUE
+                }
+                .write_allowed <<- value
+                sync_permissions(.self, .self$cache_data)
+                value
+            }
+        },      
+        .write_on_cache = "logical",
+        write_on_cache = function(value)
+        {
+            if(missing(value))
+                .write_on_cache
+            else
+            {
+                if(is.na(value))
+                {
+                    warning("NAs not allowed for write_on_cache field of CodeCacheSet objects, interpeting as FALSE")
+                    value = FALSE
+                }
+                .write_on_cache <<- value
+                sync_permissions(.self, .self$cache_data)
+                value
+            }
+        }
+    ),
     methods = list(
         find_data= function(hash, check_disk = TRUE, extra_dirs = NULL)
         {
@@ -274,6 +342,8 @@ codeCacheSet = setRefClass("CodeCacheSet",
         },
         to_disk = function(dir, clear_mem)
         {
+            if(!write_allowed)
+                stop("Attempted to write cache to disk via a CodeCacheSet with writing disallowed")
             if(missing(dir))
                 dir = .self$cache_dir
             if(is.na(dir))
@@ -286,12 +356,16 @@ codeCacheSet = setRefClass("CodeCacheSet",
                       "## This file was automatically generated for provenance purposes ##",
                       "## Do Not Edit ##",
                       sprintf("## Hash: %s ##", .self$hash),
+                      sprintf("## Input Variables: %s ##", paste(inputs, collapse = ", ")),
+                      sprintf("## Output Variables: %s ##", paste(outputs, collapse = ", ")),
+                      
                       "##################################################",
                       paste(.self$code, collapse="\n"), sep="\n"),
                       file = file.path(dir, "code.R"))
         },
         add_data = function(dat)
         {
+            sync_permissions(.self, dat)
             cache_data[[dat$inputs_hash]] <<- dat
             if(.self$write_on_cache)
                 cache_data[[dat$inputs_hash]]$to_disk(clear_mem = FALSE)
@@ -306,6 +380,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
             res = callSuper(...)
             if(populate)
                 .self$populate()
+            sync_permissions(.self, .self$cache_data)
             res
         },
         load_in_mem = function(hashes = names(.self$cache_data))
@@ -325,20 +400,20 @@ codeCacheSet = setRefClass("CodeCacheSet",
      
           #  if(!file.exists(.self$cache_dir))
            #     dir.create(.self$cache_dir, recursive=TRUE)
-            cds = readCachedData(.self$cache_dir, load_data = load_data)
+            if(refresh_existing)
+                excl = character()
+            else
+                excl = names(cache_data)
+            cds = readCachedData(.self$cache_dir, load_data = load_data, exclude_hashes = excl, write_allowed = .self$write_allowed)
             hshs = sapply(cds, function(x) x$inputs_hash)
-            if(!refresh_existing)
-                {
-                    inds = which(!(hshs %in% names(cache_data)))
-                    hshs = hshs[inds]
-                    cds = cds[inds]
-                }
-            cache_data[hshs] <<- cds
+            lapply(cds, function(x) .self$add_data(x))
+            #permissions are synced in add_data
+            cache_data
         }
         
-        )
     )
-        
+)
+
 
 cachedData = setRefClass("CachedData",
     fields = list(
@@ -364,8 +439,40 @@ cachedData = setRefClass("CachedData",
         last_used = "ANY",
         plot = "ANY",
         gdevs = "list",
-        file_stale = "logical"),
-    methods = list(
+        file_stale = "logical",
+       .write_allowed = "logical",
+        write_allowed = function(value)
+        {
+            if(missing(value))
+                .write_allowed
+            else
+            {
+                if(is.na(value))
+                {
+                    warning("NAs not allowed for write_allowed field of CachedData objects, interpreting as TRUE")
+                    value = TRUE
+                }
+                .write_allowed <<- value
+            }
+        },
+#XXX This seems really unnecessary, CachedData objects don't ever "cache", its purely a hack to allow sync_permissions to be general. Find a better solution!
+        .write_on_cache = "logical",
+        write_on_cache = function(value)
+        {
+            if(missing(value))
+                .write_on_cache
+            else
+            {
+                if(is.na(value))
+                {
+                    warning("NAs not allowed for write_on_cache field of CachedData objects, interpeting as FALSE")
+                    value = FALSE
+                }
+                .write_on_cache <<- value
+            }
+        }
+    ),
+methods = list(
         mem_size = function()
         {
             if(!length(ls(envir = .data)))
@@ -393,6 +500,8 @@ cachedData = setRefClass("CachedData",
         },
         to_disk = function(tmp = FALSE, clear_mem = TRUE,force = FALSE, location)
         {
+            if(!write_allowed)
+                stop("Attempted to write cache to disk via CachedData with writing disallowed")
             #check if there is something to write, otherwise immediately return
             if(!is.na(file_stale) && !file_stale && !force && (location == disk_location || (tmp && location == tmp_disk_location)))
                 return()
@@ -457,5 +566,16 @@ cachedData = setRefClass("CachedData",
                     "cache_", hsh, ".rda")), envir = .data)
         })
     )
-        
+
+
+sync_permissions = function(from, to, full_sync = FALSE)
+{
+    if(!is(to, "list"))
+        to = list(to)
+    if(full_sync|| (length(from$write_allowed) && !from$write_allowed))
+        sapply(to, function(x) x$write_allowed = from$write_allowed)
+    if(full_sync|| (length(from$write_on_cache) && from$write_on_cache))
+        sapply(to, function(x) x$write_on_cache= from$write_on_cache)
+}
+
                     
