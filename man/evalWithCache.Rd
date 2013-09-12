@@ -1,6 +1,5 @@
 \name{evalWithCache}
 \alias{evalWithCache}
-%- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 Evaluate a piece of code with caching
 }
@@ -9,7 +8,9 @@ Evaluate a piece of code with caching
   variable value) dependent cached evaluation  of it.
 }
 \usage{
-evalWithCache(code, codeInfo, inputVars, outputVars, cache = cachingEngine(write_on_cache = TRUE), env = .GlobalEnv, force = FALSE, cacheRand = FALSE, verbose = FALSE, gexts = "png", gdev = sapply(gexts, function(nm) get(nm, mode = "function")), ...)
+evalWithCache(code, codeInfo, inputVars, outputVars, cache =
+cachingEngine(write_on_cache = TRUE), eval_fun= cache$eval_fun,
+return_handler = cache$return_handler,  env = .GlobalEnv, force = FALSE, cacheRand = FALSE, verbose = FALSE, gexts = "png", gdev = sapply(gexts, function(nm) get(nm, mode = "function")), ...)
 }
 \arguments{
   \item{code}{
@@ -36,7 +37,14 @@ evalWithCache(code, codeInfo, inputVars, outputVars, cache = cachingEngine(write
     immediately writes any created caches to disk. If provided, the
     object passed into \code{cache} will be updated during the call to
     evalWithCache due to the fact it is a reference class.
-}
+  }
+  \item{eval_fun}{Function to be used to evaluate the code. Almost
+    always the default of \code{cache$eval_fun}.
+  }
+  \item{return_handler}{Function to be called to process the
+    output/return value of \code{eval_fun}. Almost always the default
+    value of \code{cache$return_handler}.
+  }
   \item{env}{
     The environment in which the code should be evaluated or the cached
     variable values should be loaded into.
@@ -89,9 +97,8 @@ evalWithCache(code, codeInfo, inputVars, outputVars, cache = cachingEngine(write
 \author{
 Gabriel Becker
 }
-\seealso{
-  \code{\linkS4class{CachingEngine}},
-  \code{\link{parseWithVis}}. \code{\link[CodeDepends]{getInputs}}
+\seealso{  
+  \code{\link{cachingEngine}}, \code{\link[CodeDepends]{getInputs}}
 }
 \examples{
 \dontrun{

@@ -1,3 +1,5 @@
+setClass("WithVisValue", representation(value = "ANY", visible = "logical"))
+setClass("WithVisPlusGraphics", representation(graphics = "ANY"), contains = "WithVisValue")
 cacheClass = setRefClass("CachingEngine",
     fields = list(
         .base_dir = "character",

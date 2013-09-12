@@ -20,6 +20,9 @@
       objects this caching engine currently knows about.}
     \item{\code{gdevs}:}{\code{list}. A list of functions to be used to create image
       files of any graphical output generated during evaluation of code.}
+
+    \item{\code{write_allowed}:}{\code{logical}. Whether this caching
+      engine supports writing caches to disk.}
     \item{\code{write_on_cache}:}{\code{logical}. Whether every cache should be written
       to disk as soon as it is created (i.e. directly after evaluation
       of code which is eligable for caching.}
@@ -43,19 +46,14 @@
   }
 }
 \section{Constructor}{
-  The \code{cachingEngine} function is provided as a constructor for
+  The \code{\link{cachingEngine}} function is provided as a constructor for
   this class with reasonable default values for the fields.
-}
-\usage{
-cachingEngine(base_dir = "./r_caches", tmp_base_dir = tempdir(), 
-    write_on_cache = FALSE, gdevs = list(png), eval_fun = parseWithVis, 
-    return_handler = withVisHandler, populate = TRUE)
 }
 \author{
   Gabriel Becker
 }
 \seealso{
-  \code{\link{evalWithCache}} \code{\linkS4class{CodeLevelCache}}
+  \code{\link{cachingEngine}} \code{\link{evalWithCache}} \code{\linkS4class{CodeCacheSet} }
 }
 \keyword{classes}
 \keyword{programming}

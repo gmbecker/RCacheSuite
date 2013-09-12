@@ -5,54 +5,65 @@
 
 \title{Class \code{"CachedData"}}
 \description{
-%%  ~~ A concise (1-5 lines) description of what the class is. ~~
-}
-\section{Extends}{
+  An R object class representing the cached evaluation results of a single
+  code/state combination. Individual sets of cached results stored
+  within a \code{CodeLevelCache} are represented as objects of this
+  class.
 
-All reference classes extend and inherit methods from \code{"\linkS4class{envRefClass}"}.
-
-}
-\references{
-%%  ~~put references to the literature/web site here~~
-}
+  This class is primarily for internal use. End users are intended to
+  use the \code{CachingEngine} or \code{evalWithCache}-level interface.
+  }
 \author{
-%%  ~~who you are~~
+  Gabriel Becker
 }
-\note{
-%%  ~~further notes~~
-}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
 \seealso{
-%%  ~~objects to See Also as \code{\link{~~fun~~}}, ~~~
-%%  ~~or \code{\linkS4class{CLASSNAME}} for links to other classes ~~~
-}
-\examples{
-showClass("CachedData")
+\code{\linkS4class{CodeCacheSet}} \code{linkS4class{CachingEngine}}
 }
 \keyword{classes}
 \section{Fields}{
   \describe{
-    \item{\code{.code_hash}:}{Object of class \code{character} ~~ }
-    \item{\code{code_hash}:}{Object of class \code{activeBindingFunction} ~~ }
-    \item{\code{.inputs_hash}:}{Object of class \code{character} ~~ }
-    \item{\code{inputs_hash}:}{Object of class \code{activeBindingFunction} ~~ }
-    \item{\code{disk_location}:}{Object of class \code{character} ~~ }
-    \item{\code{tmp_disk_location}:}{Object of class \code{character} ~~ }
-    \item{\code{.data}:}{Object of class \code{environment} ~~ }
-    \item{\code{last_used}:}{Object of class \code{ANY} ~~ }
-    \item{\code{plot}:}{Object of class \code{ANY} ~~ }
-    \item{\code{gdevs}:}{Object of class \code{list} ~~ }
-    \item{\code{file_stale}:}{Object of class \code{logical} ~~ }
+    \item{\code{code_hash}:}{The hash representing the code associated
+      with this cache. }
+    \item{\code{inputs_hash}:}{The hash representing the state
+      (values of input variables) of this cache. }
+    \item{\code{disk_location}:}{Location on disk that this cache object
+    with read from and write to.}
+    \item{\code{tmp_disk_location}:}{Temporary disk location this cache
+      object will read from and write to }
+    \item{\code{.data}:}{An environment which stores the caches results
+      when the cache is loaded into memory }
+    \item{\code{last_used}:}{A representation of the last time the
+      results in the cache were used during a cached evaluation. }
+    \item{\code{plot}:}{Any plotting results associated with the cached results}
+    \item{\code{gdevs}:}{A list of graphics devices to use to save
+      static images of the contents of \code{plot} when the cache is
+      written to disk}
+    \item{\code{file_stale}:}{Whether the contents of the cache have
+      changed since the last time it was written to disk. }
   }
 }
 \section{Methods}{
+  These methods are exported and documented but not intended for direct
+  use. They are typically called automatically via methods on the
+  \code{CachingEngine} and \code{CodeLevelCache} classes.
   \describe{
-    \item{\code{from_disk(location, hsh)}:}{ ~~ }
-    \item{\code{unload_mem()}:}{ ~~ }
-    \item{\code{retrieve_data(env)}:}{ ~~ }
-    \item{\code{to_disk(tmp, clear_mem, force, location)}:}{ ~~ }
-    \item{\code{mem_size()}:}{ ~~ }
+    \item{\code{from_disk(location, hsh)}:}{ Write the contents of this
+      cache to disk. }
+    \item{\code{unload_mem()}:}{ Unload the R objects representing the
+      results stored in the cache from memory. This does not destroy the
+    \code{CachingEngine} object itself, it simply empties the
+    \code{.data} evironment.}
+    \item{\code{retrieve_data(env)}:}{ Populate the \code{env}
+      environment with the results stored in the cache, as if the
+      original code had been evaluated in that environment.}
+    \item{\code{to_disk(tmp, clear_mem, force, location)}:}{ Write the
+      contents of this cache to disk. \code{tmp} indicates that the
+      temporary directory sould be used, \code{clear_mem} indicates that
+    the cache should be unloaded from memory after writing, and
+    \code{location} indicates the location on disk to write.}
+    \item{\code{mem_size()}:}{ Returns the size of the objects
+      associated with this cache that are currently being stored in
+      memory. \code{0} indicates that the cache is searchable but no
+      results are currently in memory.}
   }
 }

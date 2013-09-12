@@ -12,8 +12,7 @@
 \usage{
 parseEval(code, env, ...)
 parseWithVis(code, env, ...)
-
-withVisHandler(val, graphics, env, evaled = TRUE, ...)
+withVisHandler(val, graphics, env, evaled = FALSE, ...)
 }
 \arguments{
   \item{code}{

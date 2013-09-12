@@ -12,22 +12,57 @@
 gclasses = c("trellis", "ggplot", "gg", "ggbio", "recordedplot")
 
 
-parseEval = function(code, env, ...) eval(parse(text=code), env=env)
+parseEval = function(code, env, ...) eval(parse(text=code), envir=env)
 
-parseWithVis = function(code, env, ...) withVisible(eval(parse(text=code), env= env))
+parseWithVis = function(code, env, ...) {
+    ret = withVisible(eval(parse(text=code), envir= env))
+    new("WithVisValue", value = ret$value, visible = ret$visible)
+}
 
 
 withVisHandler = function(val, graphics, env, evaled = FALSE, ...)
 {
+    raw = withVisRaw(val, graphics, env, evaled, ...)
+    invisible(raw@value)
+}
+
+withVisRaw = function(val, graphics, env, evaled = FALSE, ...)
+{
+    if(!is(val, "WithVisValue"))
+        stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
     if(length(graphics) && !evaled)
         redrawPlot(graphics)
-    if(val$visible)
-        show(val$value)
-    val$value
+    if(val@visible)
+        show(val@value)
+    invisible(as(val, "WithVisPlusGraphics", graphics = graphics))
+}
+
+wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
+{
+    if(!is(val, "WithVisValue"))
+        stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
+    if(length(graphics) && !evaled)
+        redrawPlot(graphics)
+    ret = as(val, "WithVisPlusGraphics")
+    #XXX will this bite us if there is a graphics object that inherits from list?
+    if(!is(graphics, "list"))
+        graphics = list(graphics)
+    ret@graphics = graphics
+    invisible(ret)
 }
 
 
+returnRaw = function(val, graphics, env, evaled = FALSE, ...)
+{
+    if(length(graphics) && !evaled)
+        redrawPlot(graphics)
+    val
+}
 
+noGraphicsRaw = function(val, graphics, env, evaled = FALSE, ...)
+{
+    val
+}
 
 evalWithCache = function(
     code,
@@ -61,7 +96,7 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
     {
         if(missing(codeInfo))
         {
-            code2 = paste("{", code, "}", collapse="\n")
+            code2 = paste(c("{", code, "}"), collapse="\n")
                                         #hack to get CodeDepends to treat the code as a single block...
             
             scr = readScript("", type="R", txt=code2)
@@ -109,8 +144,8 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
         
         xxx_returnvalue = cache$eval_fun(code = code, env = env, ...)
         
-        assign("xxx_returnvalue", xxx_returnvalue, env = env)
-        assign("xxx_handler", return_handler, env = env)
+        assign("xxx_returnvalue", xxx_returnvalue, envir = env)
+        assign("xxx_handler", return_handler, envir = env)
         xxx_graphics = NULL
         #check if there an active graphics device and if so if its contents are different than
         #the contents
@@ -119,7 +154,7 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
         if(newdev > 1 && (is.null(oldplot) || newdev != olddev || ! identical(oldplot, recordPlot() ) ) )
             xxx_graphics = recordPlot()
         
-        assign("xxx_graphics", xxx_graphics, env)
+        assign("xxx_graphics", xxx_graphics, envir =  env)
         
         #XXX previously outlist included pcode. why did I think i needed the pcode value? Am I using it somehwere?
         outlist = c("xxx_returnvalue", "xxx_handler", "xxx_graphics",  outputVars)
@@ -141,7 +176,7 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
             #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
             newcd = cachedData$new(code_hash = chash, inputs_hash = ihash, disk_location = file.path(cache$base_dir, sprintf("code_%s", chash)), tmp_disk_location = file.path(cache$tmp_base_dir, sprintf("code_%s", chash)), .data = new.env(), file_stale = TRUE, plot = xxx_graphics, gdevs = gdev, write_allowed = cset$write_allowed)
             for(o in outlist)
-                assign(o, get(o, env = env), newcd$.data)
+                assign(o, get(o, envir = env), envir = newcd$.data)
             cset$add_data(newcd)
         }
         returnvalue = return_handler(xxx_returnvalue, xxx_graphics, env, evaled = TRUE)
