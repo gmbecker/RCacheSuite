@@ -45,9 +45,17 @@ wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
         redrawPlot(graphics)
     ret = as(val, "WithVisPlusGraphics")
     #XXX will this bite us if there is a graphics object that inherits from list?
-    if(!is(graphics, "list"))
-        graphics = list(graphics)
-    ret@graphics = graphics
+    if(!is(graphics, "list")) {
+        if(!is.null(graphics))
+            graphics = list(graphics)
+        else
+            graphics = list()
+    }
+    #Only return the special WithVisPlusGraphics object if we actually have graphics, otherwise return the original WithVisValue
+    if(length(graphics))
+        ret@graphics = as(graphics, "PlotList")
+    else
+        ret = val
     invisible(ret)
 }
 

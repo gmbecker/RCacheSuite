@@ -1,5 +1,7 @@
 setClass("WithVisValue", representation(value = "ANY", visible = "logical"))
-setClass("WithVisPlusGraphics", representation(graphics = "ANY"), contains = "WithVisValue")
+setClass("PlotList", contains = "list")
+setClass("WithVisPlusGraphics", representation(graphics = "PlotList"), contains = "WithVisValue")
+
 cacheClass = setRefClass("CachingEngine",
     fields = list(
         .base_dir = "character",
