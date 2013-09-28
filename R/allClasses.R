@@ -46,7 +46,7 @@ cacheClass = setRefClass("CachingEngine",
             {
                 if(is.na(value))
                 {
-                    warning("NAs not allowed for write_allowed field of CachingEngine objects, interpreting as TRUE")
+                    warning("NULL and NAs not allowed for write_allowed field of CachingEngine objects, interpreting as TRUE")
                     value = TRUE
                 }
                 .write_allowed <<- value
@@ -61,7 +61,7 @@ cacheClass = setRefClass("CachingEngine",
                 .write_on_cache
             else
             {
-                if(is.na(value))
+                if(!length(value) || is.na(value))
                 {
                     warning("NAs not allowed for write_on_cache field of CachingEngine objects, interpeting as FALSE")
                     value = FALSE
@@ -306,7 +306,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 .write_allowed
             else
             {
-                if(is.na(value))
+                if(!length(value) || is.na(value))
                 {
                     warning("NAs not allowed for write_allowed field of CodeCacheSet objects, interpreting as TRUE")
                     value = TRUE
@@ -323,7 +323,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
                 .write_on_cache
             else
             {
-                if(is.na(value))
+                if(!length(value) || is.na(value))
                 {
                     warning("NAs not allowed for write_on_cache field of CodeCacheSet objects, interpeting as FALSE")
                     value = FALSE
@@ -451,7 +451,7 @@ cachedData = setRefClass("CachedData",
                 .write_allowed
             else
             {
-                if(is.na(value))
+                if(!length(value) || is.na(value))
                 {
                     warning("NAs not allowed for write_allowed field of CachedData objects, interpreting as TRUE")
                     value = TRUE
@@ -467,7 +467,7 @@ cachedData = setRefClass("CachedData",
                 .write_on_cache
             else
             {
-                if(is.na(value))
+                if(!length(value) || is.na(value))
                 {
                     warning("NAs not allowed for write_on_cache field of CachedData objects, interpeting as FALSE")
                     value = FALSE

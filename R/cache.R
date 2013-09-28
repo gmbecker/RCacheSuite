@@ -19,6 +19,8 @@ parseWithVis = function(code, env, ...) {
     new("WithVisValue", value = ret$value, visible = ret$visible)
 }
 
+#@val is an arbitrary object in the exact form returned by the evaluation function
+#@graphics is a PlotList  object (essentially a list) with 0 or more recordedplot objects in it
 
 withVisHandler = function(val, graphics, env, evaled = FALSE, ...)
 {
@@ -31,10 +33,14 @@ withVisRaw = function(val, graphics, env, evaled = FALSE, ...)
     if(!is(val, "WithVisValue"))
         stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
     if(length(graphics) && !evaled)
-        redrawPlot(graphics)
+        lapply(graphics, redrawPlot)
     if(val@visible)
         show(val@value)
-    invisible(as(val, "WithVisPlusGraphics", graphics = graphics))
+    if(length(graphics))
+        val = new("WithVisPlusGraphics", value = val@value, visible = val@visible, graphics = graphics)
+    invisible(val)
+    #invisible(as(val, "WithVisPlusGraphics", graphics = graphics))
+    
 }
 
 wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
@@ -154,13 +160,13 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
         
         assign("xxx_returnvalue", xxx_returnvalue, envir = env)
         assign("xxx_handler", return_handler, envir = env)
-        xxx_graphics = NULL
+        xxx_graphics = as(list(), "PlotList")
         #check if there an active graphics device and if so if its contents are different than
         #the contents
         # Hadley's evaluate package does a more sophisticated version of this check, but do we want to depend on it just for that?
         newdev = dev.cur()
         if(newdev > 1 && (is.null(oldplot) || newdev != olddev || ! identical(oldplot, recordPlot() ) ) )
-            xxx_graphics = recordPlot()
+            xxx_graphics[[length(xxx_graphics) + 1]] =  recordPlot()
         
         assign("xxx_graphics", xxx_graphics, envir =  env)
         
