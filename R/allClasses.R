@@ -536,9 +536,12 @@ methods = list(
                 {
                     mapply(function(ext, f)
                            {
-                               f(file.path(location, paste0("plot_", inputs_hash, ".", ext)))
-                               redrawPlot(.data$xxx_graphics)
-                               dev.off()
+                               for(i in seq(along = .data$xxx_graphics))
+                               {
+                                   f(file.path(location, paste0("plot_",i, "_", inputs_hash, ".", ext)))
+                                   redrawPlot(.data$xxx_graphics[[i]])
+                                   dev.off()
+                               }
                            }, names(gdevs), gdevs)
                 }
             if(clear_mem)

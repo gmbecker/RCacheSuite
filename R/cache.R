@@ -28,6 +28,7 @@ withVisHandler = function(val, graphics, env, evaled = FALSE, ...)
     invisible(raw@value)
 }
 
+
 withVisRaw = function(val, graphics, env, evaled = FALSE, ...)
 {
     if(!is(val, "WithVisValue"))
@@ -43,6 +44,7 @@ withVisRaw = function(val, graphics, env, evaled = FALSE, ...)
     
 }
 
+#this seems redundant based on above...
 wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
 {
     if(!is(val, "WithVisValue"))
@@ -51,12 +53,13 @@ wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
         redrawPlot(graphics)
     ret = as(val, "WithVisPlusGraphics")
     #XXX will this bite us if there is a graphics object that inherits from list?
-    if(!is(graphics, "list")) {
+    if(!is(graphics, "PlotList")) {
         if(!is.null(graphics))
             graphics = list(graphics)
         else
             graphics = list()
     }
+    graphics = as(graphics, "PlotList")
     #Only return the special WithVisPlusGraphics object if we actually have graphics, otherwise return the original WithVisValue
     if(length(graphics))
         ret@graphics = as(graphics, "PlotList")
@@ -156,7 +159,7 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
         oldplot = if(dev.cur() > 1) recordPlot() else NULL
         olddev = dev.cur()
         
-        xxx_returnvalue = cache$eval_fun(code = code, env = env, ...)
+        xxx_returnvalue = eval_fun(code = code, env = env, ...)
         
         assign("xxx_returnvalue", xxx_returnvalue, envir = env)
         assign("xxx_handler", return_handler, envir = env)
