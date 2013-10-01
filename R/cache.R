@@ -50,7 +50,7 @@ wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
     if(!is(val, "WithVisValue"))
         stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
     if(length(graphics) && !evaled)
-        redrawPlot(graphics)
+        lapply(graphics, redrawPlot)
     ret = as(val, "WithVisPlusGraphics")
     #XXX will this bite us if there is a graphics object that inherits from list?
     if(!is(graphics, "PlotList")) {
@@ -62,7 +62,7 @@ wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
     graphics = as(graphics, "PlotList")
     #Only return the special WithVisPlusGraphics object if we actually have graphics, otherwise return the original WithVisValue
     if(length(graphics))
-        ret@graphics = as(graphics, "PlotList")
+        ret@graphics = graphics
     else
         ret = val
     invisible(ret)
@@ -72,7 +72,7 @@ wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
 returnRaw = function(val, graphics, env, evaled = FALSE, ...)
 {
     if(length(graphics) && !evaled)
-        redrawPlot(graphics)
+        lapply(graphics, redrawPlot)
     val
 }
 
@@ -148,6 +148,8 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
         #The handler handles reproducing side effects such as printing, warning/error message, and graphics.
         if(!is.null(env$xxx_handler))
             returnvalue = env$xxx_handler(xxx_returnvalue, env$xxx_graphics, , env = env, evaled = FALSE)
+        else
+            returnvalue = xxx_returnvalue
     } else {
         if(verbose)
             cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
