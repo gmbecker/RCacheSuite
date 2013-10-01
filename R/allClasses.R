@@ -46,7 +46,7 @@ cacheClass = setRefClass("CachingEngine",
             {
                 if(is.na(value))
                 {
-                    warning("NULL and NAs not allowed for write_allowed field of CachingEngine objects, interpreting as TRUE")
+#                    warning("NULL and NAs not allowed for write_allowed field of CachingEngine objects, interpreting as TRUE")
                     value = TRUE
                 }
                 .write_allowed <<- value
@@ -63,7 +63,7 @@ cacheClass = setRefClass("CachingEngine",
             {
                 if(!length(value) || is.na(value))
                 {
-                    warning("NAs not allowed for write_on_cache field of CachingEngine objects, interpeting as FALSE")
+                #    warning("NAs not allowed for write_on_cache field of CachingEngine objects, interpeting as FALSE")
                     value = FALSE
                 }
                 .write_on_cache <<- value
@@ -193,7 +193,7 @@ cacheClass = setRefClass("CachingEngine",
                     newset
                 }
         },                    
-        initialize = function(..., populate = TRUE)
+        initialize = function(..., populate = FALSE)
         {
             res = callSuper(...)
             if(populate)
@@ -308,7 +308,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
             {
                 if(!length(value) || is.na(value))
                 {
-                    warning("NAs not allowed for write_allowed field of CodeCacheSet objects, interpreting as TRUE")
+#                    warning("NAs not allowed for write_allowed field of CodeCacheSet objects, interpreting as TRUE")
                     value = TRUE
                 }
                 .write_allowed <<- value
@@ -325,7 +325,7 @@ codeCacheSet = setRefClass("CodeCacheSet",
             {
                 if(!length(value) || is.na(value))
                 {
-                    warning("NAs not allowed for write_on_cache field of CodeCacheSet objects, interpeting as FALSE")
+#                    warning("NAs not allowed for write_on_cache field of CodeCacheSet objects, interpeting as FALSE")
                     value = FALSE
                 }
                 .write_on_cache <<- value
@@ -453,7 +453,7 @@ cachedData = setRefClass("CachedData",
             {
                 if(!length(value) || is.na(value))
                 {
-                    warning("NAs not allowed for write_allowed field of CachedData objects, interpreting as TRUE")
+#                    warning("NAs not allowed for write_allowed field of CachedData objects, interpreting as TRUE")
                     value = TRUE
                 }
                 .write_allowed <<- value
@@ -469,7 +469,7 @@ cachedData = setRefClass("CachedData",
             {
                 if(!length(value) || is.na(value))
                 {
-                    warning("NAs not allowed for write_on_cache field of CachedData objects, interpeting as FALSE")
+#                    warning("NAs not allowed for write_on_cache field of CachedData objects, interpeting as FALSE")
                     value = FALSE
                 }
                 .write_on_cache <<- value
