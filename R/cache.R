@@ -15,7 +15,8 @@ gclasses = c("trellis", "ggplot", "gg", "ggbio", "recordedplot")
 parseEval = function(code, env, ...) eval(parse(text=code), envir=env)
 
 parseWithVis = function(code, env, ...) {
-    ret = withVisible(eval(parse(text=code), envir= env))
+#    ret = withVisible(eval(parse(text=code), envir= env))
+    ret = withVisible(eval(code, envir = env))
     new("WithVisValue", value = ret$value, visible = ret$visible)
 }
 
@@ -29,7 +30,7 @@ withVisHandler = function(val, graphics, env, evaled = FALSE, ...)
 }
 
 
-withVisRaw = function(val, graphics, env, evaled = FALSE, ...)
+withVisRaw = function(val, graphics, env, evaled = FALSE,  ...)
 {
     if(!is(val, "WithVisValue"))
         stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
@@ -81,8 +82,7 @@ noGraphicsRaw = function(val, graphics, env, evaled = FALSE, ...)
     val
 }
 
-evalWithCache = function(
-    code,
+evalWithCache = function(code,
     codeInfo,
     inputVars, #overrides automatically detected inputs
     outputVars, #overrides automatically detected outputs
@@ -97,52 +97,82 @@ evalWithCache = function(
     cacheRand = FALSE,
     verbose = FALSE,
     gexts = "png",
-gdev = sapply(gexts, function(nm) get(nm, mode="function")),
+    gdev = sapply(gexts, function(nm) get(nm, mode="function")),
+    last = TRUE,
+    stopMissingInput = FALSE,
+    asSingleEnt = FALSE,
+    singleEntFun= sameOutVar,
+    unCacheable = mustForce,
     ...)
 {
-    if(length(code) > 1)
+    if(is.character(code))
     {
-        if(all(grepl("\\n", code[-length(code)])))
-            code = paste(code, collapse="")
-        else
-            code = paste(code, collapse="\n")
+        code = readScript("", "R", txt = code)
     }
     
+    if(is(code, "Script") && length(code) > 1)
+    {
+        if(asSingleEnt || (is.function(singleEntFun) && singleEntFun(code)))
+        {
+            oneExpr = paste("{", paste(as(code, "character"), collapse = "\n"), "}", collapse = "\n")
+            code = readScript("", "R", oneExpr)
+        } else {
+
+            lapply(code[-length(code)], evalWithCache, cache = cache, eval_fun = eval_fun, return_handler = return_handler, env = env, force = force, cacheRand = cacheRand, verbose = verbose, gexts = gexts, gdev = gdev, last = FALSE, ...)
+            return(evalWithCache(code[[length(code)]], cache = cache, eval_fun = eval_fun, return_handler = return_handler, env = env, force = force, cacheRand = cacheRand, verbose = verbose, gexts = gexts, gdev = gdev, last = TRUE, ...))
+        }
+    }
+
+    if(missing(codeInfo))
+    {
+        codeInfo = getInputs(code)
+        if(!is(codeInfo, "ScriptNodeInfo"))
+            codeInfo = codeInfo[[1]]
+    }
+
+
+    #we can't cache certain types of expressions, calls to library, load, par, options, etc. The unCacheable argument accepts a function which accepts codeInfo for an expression and returns TRUE if the expression is uncacheable.
+    if(!force)
+    {
+        if(unCacheable(codeInfo))
+            force = TRUE
+    }
     
     if(missing(inputVars)||missing(outputVars))
     {
-        if(missing(codeInfo))
-        {
-            code2 = paste(c("{", code, "}"), collapse="\n")
-                                        #hack to get CodeDepends to treat the code as a single block...
-            
-            scr = readScript("", type="R", txt=code2)
-            codeInfo = getInputs(scr)[[1]]
-        }
         if(missing(inputVars))
-            inputVars = codeInfo@inputs
+            inputVars = c(codeInfo@inputs, codeInfo@updates)
         if(missing(outputVars))
-            outputVars = codeInfo@outputs
-        
+            outputVars = c(codeInfo@outputs, codeInfo@updates)
     }
-    
+
+    if(is(code, "Script"))
+        code = code[[1]]
     #parse and deparse the code to get rid of the annoying "adding a space invalidates the cache" issue other systems have
 
-    pcode = unparse(parse(text=code, keep.source=FALSE))
-                                        #do the required inputs even exist in the current session?
+    pcode = get_parsed_code(code)
+    if(verbose)
+        cat(paste(pcode, ":  "))
+    #do the required inputs even exist in the current session?
     in_exist = sapply(inputVars, exists, envir = env)
     if(!all(in_exist))
-        stop(paste("Missing variable(s) required to evaluate codeblock:", inputVars[!in_exist], collapse = " "))
+    {
+        if(stopMissingInput)
+            stop(paste("Missing variable(s) required to evaluate codeblock:", inputVars[!in_exist], collapse = " "))
+        else
+            warning(paste("Missing inputs? Variables detected as inputs but not found:", inputVars[!in_exist], collapse = " "))
+    }
+            
     
     #make the list we will digest to get the hash. It includes the (properly handled) code as well as the current values of all the input variables
     chash = digest(pcode)
-    ihash = digest(lapply(inputVars, get, envir = env))
+    ihash = digest(mget(inputVars, envir = env, ifnotfound=list(NULL)))
     
     fnd = cache$find_data(chash, ihash)
     if(is(fnd, "CachedData") && !force)
     {
         if(verbose)
-            cat(paste(sprintf("\nExisting cache found: %s %s", chash, ihash),"\n"))
+            cat("using matching cache.\n")
         fnd$retrieve_data(env)
         xxx_returnvalue = get("xxx_returnvalue", env)
         #The handler handles reproducing side effects such as printing, warning/error message, and graphics.
@@ -152,7 +182,8 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
             returnvalue = xxx_returnvalue
     } else {
         if(verbose)
-            cat(paste(sprintf("\nNo cache found. Creating new cache: %s %s",chash, ihash), "\n"))
+            cat("evaluating.\n")
+
         if(exists(".Random.seed"))
             oldRS = .Random.seed
         else
@@ -203,4 +234,34 @@ gdev = sapply(gexts, function(nm) get(nm, mode="function")),
     #clean up ugly detrius once we're done.
     rm(list = c("xxx_returnvalue", "xxx_graphics", "xxx_handler"), envir = env)
     invisible(returnvalue)
+}
+
+
+nocache = c("par", "options", "load", "rm", "source")
+#This function checks for whether there are uncachable functions called by the expression.
+mustForce = function(codeInf, nonCachedFuns = nocache)
+{
+    ret = FALSE
+    if(length(codeInf@libraries))
+        ret = TRUE
+    if(any(nonCachedFuns %in% codeInf@functions))
+        ret = TRUE
+    ret
+}
+
+#this function provides a simple heuristic for when a block of code should be cached as a single entity. 
+#It returns true when all expressions in the block create or modify the same variable (or none at all), i.e.
+#x=data.frame(y=rnorm(100), z=rnorm(100))
+#x$y[x$y > 3] = NA
+#x$col3 = sample(1:4, 100, TRUE)
+#This could be made more sophisticated but I don't think there's going to be a general "always right" heuristic, which is why the user can specify their own, or none at all.
+sameOutVar = function(code)
+{
+    cinfo = getInputs(code)
+    outputs = unlist(lapply(cinfo, function(x) c(x@outputs, x@updates)))
+    if(length(unique(outputs)) == 1)
+        TRUE
+    else
+        FALSE
+
 }

@@ -1,3 +1,20 @@
+get_parsed_code = function(code)
+{
+   res =  switch(class(code),
+           character = unparse(parse(text = code, keep.source=FALSE)),
+           expression = deparse(code, control = "all"),
+           "<-" = deparse(code),
+           "=" = deparse(code),
+           "call" = deparse(code),
+           "if" = deparse(code),
+           deparse(code)
+           )
+   if(length(res) > 1)
+       res = paste(res, collapse ="\n")
+   res
+}
+
+
 unparse = function(expr)
     {
         if(!is(expr, "expression"))

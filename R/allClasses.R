@@ -165,15 +165,21 @@ cacheClass = setRefClass("CachingEngine",
         {
             if(is.null(inputs)|| is.null(outputs))
                 {
-                    code2 = paste("{", code, "}", collapse="\n")
+         #           code2 = paste("{", code, "}", collapse="\n")
                     #hack to get CodeDepends to treat the code as a single block...
-                    scr = readScript("", type="R", txt=code2)
+                    if(is.character(code))
+                        scr = readScript("", type="R", txt=code)
+                    else
+                        scr = code
                     codeInfo = getInputs(scr)[[1]]
                     
                     inputs = codeInfo@inputs
                     outputs = codeInfo@outputs
                 }
-            pcode = unparse(parse(text=code, keep.source=FALSE))
+
+            #if code is not a character, then it is assumed to be an already parsed expression, either of class "expression" or "call", "if", "=", etc from readScript. get_parsed_code handles all of these.
+                pcode = get_parsed_code(code)
+
             if(!identical(pcode, code))
                 warning("unparse(parse(code)) and code are not identical. This could potentially cause a hash mismatch. Perhaps unparsed code was passed into get_or_create_set (this should not happen)?")
             chash = digest(pcode)
