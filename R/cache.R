@@ -164,9 +164,9 @@ evalWithCache = function(code,
     }
             
     
-    #make the list we will digest to get the hash. It includes the (properly handled) code as well as the current values of all the input variables
-    chash = digest(pcode)
-    ihash = digest(mget(inputVars, envir = env, ifnotfound=list(NULL)))
+    #make the list we will fastdigest to get the hash. It includes the (properly handled) code as well as the current values of all the input variables
+    chash = fastdigest(pcode)
+    ihash = fastdigest(mget(inputVars, envir = env, ifnotfound=list(NULL)))
     
     fnd = cache$find_data(chash, ihash)
     if(is(fnd, "CachedData") && !force)

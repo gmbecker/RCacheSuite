@@ -182,7 +182,7 @@ cacheClass = setRefClass("CachingEngine",
 
             if(!identical(pcode, code))
                 warning("unparse(parse(code)) and code are not identical. This could potentially cause a hash mismatch. Perhaps unparsed code was passed into get_or_create_set (this should not happen)?")
-            chash = digest(pcode)
+            chash = fastdigest(pcode)
             if(chash %in% names(cache_sets))
                 cache_sets[[chash]]
             else
