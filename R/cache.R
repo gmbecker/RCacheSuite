@@ -23,36 +23,21 @@ parseWithVis = function(code, env, ...) {
 #@val is an arbitrary object in the exact form returned by the evaluation function
 #@graphics is a PlotList  object (essentially a list) with 0 or more recordedplot objects in it
 
-withVisHandler = function(val, graphics, env, evaled = FALSE, ...)
+withVisHandler = function(val, graphics, env, evaled = FALSE, last = FALSE, ...)
 {
-    raw = withVisRaw(val, graphics, env, evaled, ...)
+    raw = withVisRaw(val, graphics, env, evaled, last,  ...)
     invisible(raw@value)
 }
 
 
-withVisRaw = function(val, graphics, env, evaled = FALSE,  ...)
+withVisRaw = function(val, graphics, env, evaled = FALSE,  last = FALSE, ...)
 {
     if(!is(val, "WithVisValue"))
         stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
     if(length(graphics) && !evaled)
         lapply(graphics, redrawPlot)
-    if(val@visible)
+    if(val@visible && last)
         show(val@value)
-    if(length(graphics))
-        val = new("WithVisPlusGraphics", value = val@value, visible = val@visible, graphics = graphics)
-    invisible(val)
-    #invisible(as(val, "WithVisPlusGraphics", graphics = graphics))
-    
-}
-
-#this seems redundant based on above...
-wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
-{
-    if(!is(val, "WithVisValue"))
-        stop("the withVisHandler return handler function expects an object of class 'WithVisValue', got an object of class: ", class(val))
-    if(length(graphics) && !evaled)
-        lapply(graphics, redrawPlot)
-    ret = as(val, "WithVisPlusGraphics")
     if(!is(graphics, "PlotList")) {
         if(!is.null(graphics))
             graphics = list(graphics)
@@ -60,13 +45,9 @@ wVGraphicsHandler = function(val, graphics, env, evaled = FALSE, ...)
             graphics = list()
         graphics = as(graphics, "PlotList")
     }
-   
-    #Only return the special WithVisPlusGraphics object if we actually have graphics, otherwise return the original WithVisValue
-#    if(length(graphics))
-        ret@graphics = graphics
- #   else
-  #      ret = val
-    invisible(ret)
+
+    val = new("WithVisPlusGraphics", value = val@value, visible = val@visible && last, graphics = graphics)
+    invisible(val)
 }
 
 
@@ -177,7 +158,7 @@ evalWithCache = function(code,
         xxx_returnvalue = get("xxx_returnvalue", env)
         #The handler handles reproducing side effects such as printing, warning/error message, and graphics.
         if(!is.null(env$xxx_handler))
-            returnvalue = env$xxx_handler(xxx_returnvalue, env$xxx_graphics, , env = env, evaled = FALSE)
+            returnvalue = env$xxx_handler(xxx_returnvalue, env$xxx_graphics, , env = env, evaled = FALSE, last = last)
         else
             returnvalue = xxx_returnvalue
     } else {
@@ -192,7 +173,7 @@ evalWithCache = function(code,
         oldplot = if(dev.cur() > 1) recordPlot() else NULL
         olddev = dev.cur()
         
-        xxx_returnvalue = eval_fun(code = code, env = env, ...)
+        xxx_returnvalue = eval_fun(code = code, env = env, evaled= TRUE, last = last, ...)
         
         assign("xxx_returnvalue", xxx_returnvalue, envir = env)
         assign("xxx_handler", return_handler, envir = env)
@@ -229,7 +210,7 @@ evalWithCache = function(code,
                 assign(o, get(o, envir = env), envir = newcd$.data)
             cset$add_data(newcd)
         }
-        returnvalue = return_handler(xxx_returnvalue, xxx_graphics, env, evaled = TRUE)
+        returnvalue = return_handler(xxx_returnvalue, xxx_graphics, env, evaled = TRUE, last = last)
     }
     #clean up ugly detrius once we're done.
     rm(list = c("xxx_returnvalue", "xxx_graphics", "xxx_handler"), envir = env)
