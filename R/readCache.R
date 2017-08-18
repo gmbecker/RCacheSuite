@@ -1,8 +1,12 @@
-readCachedData = function(dir, load_data = TRUE, exclude_hashes = character(), write_allowed = TRUE, write_on_cache = FALSE)
+readCachedData = function(dir, load_data = TRUE,
+                          exclude_hashes = character(),
+                          write_allowed = TRUE,
+                          write_on_cache = FALSE)
     {
         if(!file.exists(dir))
             return(list())
-        chash = gsub(".*_([[:alnum:]]*).*", "\\1", normalizePath(file.path(dir, "..")))
+        chash = gsub(".*_([[:alnum:]]*).*", "\\1",
+                     normalizePath(file.path(dir, "..")))
         fils = list.files(dir, pattern="cache_", full.names=TRUE)
         if(length(exclude_hashes))
         {
@@ -16,7 +20,13 @@ readCachedData = function(dir, load_data = TRUE, exclude_hashes = character(), w
             return(list())
         mapply(function(file, ihash, chash)
                {
-                   cacheout = new("CachedData", code_hash = chash, inputs_hash = ihash, .data = new.env(),disk_location = dirname(file), file_stale = FALSE, write_allowed = write_allowed, write_on_cache = write_on_cache)
+                   cacheout = new("CachedData", code_hash = chash,
+                                  inputs_hash = ihash,
+                                  .data = new.env(),
+                                  disk_location = dirname(file),
+                                  file_stale = FALSE,
+                                  write_allowed = write_allowed,
+                                  write_on_cache = write_on_cache)
                    if(load_data)
                        load(file = file, envir = cacheout$.data)
                    cacheout
@@ -24,13 +34,16 @@ readCachedData = function(dir, load_data = TRUE, exclude_hashes = character(), w
     }
 
 
-readCodeCache = function(dir, load_data = TRUE, write_allowed = TRUE, write_on_cache = FALSE)
+readCodeCache = function(dir, load_data = TRUE, write_allowed = TRUE,
+                         write_on_cache = FALSE)
 {
     if(!validCodeCache(dir))
         return(NULL)
     hash = gsub(".*_([[:alnum:]]*).*", "\\1", dir)
     code = unparse(parse(file.path(dir, "code.R"), keep.source=FALSE))
-    cSetOut = new("CodeCacheSet", hash = hash, cache_dir = dir, code = code, write_allowed = write_allowed, write_on_cache = write_on_cache)
+    cSetOut = new("CodeCacheSet", hash = hash, cache_dir = dir,
+                  code = code, write_allowed = write_allowed,
+                  write_on_cache = write_on_cache)
     cSetOut$populate(load_data = load_data)
     cSetOut
 }

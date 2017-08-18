@@ -1,7 +1,23 @@
+
+#'@import CodeDepends fastdigest methods
+#' @import grDevices
+NULL
+
+#' ObjectClasses
+#' @description these object classes are used by the RCacheSuite package. most should not be created or interacted with manually.
+#' @docType methods
+#' @exportClass WithVisValue
+#' @rdname objclasses 
 setClass("WithVisValue", representation(value = "ANY", visible = "logical"))
+#' @exportClass PlotList
+#' @rdname objclasses 
 setClass("PlotList", contains = "list")
+#' @exportClass WithVisPlusGraphics
+#' @rdname objclasses 
 setClass("WithVisPlusGraphics", representation(graphics = "PlotList"), contains = "WithVisValue")
 
+#' @exportClass CachingEngine
+#' @rdname objclasses 
 cacheClass = setRefClass("CachingEngine",
     fields = list(
         .base_dir = "character",
@@ -228,14 +244,52 @@ cacheClass = setRefClass("CachingEngine",
         )
     )
 
-cachingEngine = function(base_dir="./r_caches", tmp_base_dir = tempdir(),
-    write_allowed = TRUE, write_on_cache = FALSE, gdevs = list(png), eval_fun = parseWithVis, return_handler = withVisHandler, populate = TRUE)
+#' @title CachingEngine Constructor
+#' @description Function for creating a Caching engine with specific
+#'     behaviors
+#' @param base_dir character value . Path to which permanent caches
+#'     should be written (if applicable)
+#' @param tmp_base_dir character value. Path to which temporary caches
+#'     should be written (if applicable)
+#' @param write_allowed logical. Should the engine allow caches to be
+#'     written to disk. Defaults to \code{TRUE}
+#' @param write_on_cache logical. Should the engine write caches to
+#'     disk immediately upon creation. Defaults to \code{FALSE}
+#' @param gdevs list. A list of graphics device functions to use when
+#'     caching plots. Defaults to \code{list(png)}
+#' @param eval_fun function. The evaluator function to be used when no
+#'     cache is found. Defaults to \code{parseWithVis}.
+#' @param return_handler function. The function to process values
+#'     returned by \code{eval_fun}. This function will be called on
+#'     values returned from \code{eval_fun} directly and those loaded
+#'     from cache. Defaults to \code{withVisHandler} which
+#'     supports plot caching.
+#' @param populate logical. Should the engine include existing caches
+#'     from \code{base_dir} upon creation. Defaults to \code{TRUE}
+#' @return A CachingEngine object suitable for use with
+#'     \code{evalWithCache}
+#' @seealso \code{\link{evalWithCache}}
+#' @author Gabriel Becker
+#' @export
+cachingEngine = function(base_dir="./r_caches",
+                         tmp_base_dir = tempdir(),
+                         write_allowed = TRUE, write_on_cache = FALSE,
+                         gdevs = list(png), eval_fun = parseWithVis,
+                         return_handler = withVisHandler,
+                         populate = TRUE)
     {
-        engine = cacheClass(base_dir = base_dir, tmp_base_dir = tmp_base_dir, write_allowed = write_allowed, write_on_cache = write_on_cache, gdevs = gdevs, eval_fun = eval_fun, return_handler = return_handler, populate = populate)
+        engine = cacheClass(base_dir = base_dir,
+                            tmp_base_dir = tmp_base_dir,
+                            write_allowed = write_allowed,
+                            write_on_cache = write_on_cache,
+                            gdevs = gdevs, eval_fun = eval_fun,
+                            return_handler = return_handler,
+                            populate = populate)
         engine
     }
 
-
+#' @exportClass CodeCacheSet
+#' @rdname objclasses 
 codeCacheSet = setRefClass("CodeCacheSet",
     fields = list(
         .hash = "character",
@@ -424,6 +478,8 @@ codeCacheSet = setRefClass("CodeCacheSet",
     )
 )
 
+#' @exportClass CachedData
+#' @rdname objclasses 
 
 cachedData = setRefClass("CachedData",
     fields = list(
