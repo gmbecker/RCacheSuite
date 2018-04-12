@@ -137,6 +137,8 @@ noGraphicsRaw = function(val, graphics, env, evaled = FALSE, ...)
     val
 }
 
+missingornull = function(x) missing(x) || is.null(x)
+
 #' @title evalWithCache
 #' 
 #' @description This function accepts a piece of R code and performs
@@ -241,9 +243,9 @@ noGraphicsRaw = function(val, graphics, env, evaled = FALSE, ...)
 #' }
 #' @export
 evalWithCache = function(code,
-    codeInfo,
-    inputVars, #overrides automatically detected inputs
-    outputVars, #overrides automatically detected outputs
+    codeInfo = NULL,
+    inputVars = NULL, #overrides automatically detected inputs
+    outputVars = NULL, #overrides automatically detected outputs
     ## The default here is write_on_cache=TRUE because we don't return
     ## the cache engine so if it isn't passed in its not retained
     ## anywhere.
@@ -297,7 +299,7 @@ evalWithCache = function(code,
         }
     }
 
-    if(missing(codeInfo))
+    if(is.null(codeInfo))
     {
         codeInfo = getInputs(code)
         if(!is(codeInfo, "ScriptNodeInfo"))
@@ -314,11 +316,11 @@ evalWithCache = function(code,
         force = TRUE
     }
     
-    if(missing(inputVars)||missing(outputVars))
+    if(is.null(inputVars)||is.null(outputVars))
     {
-        if(missing(inputVars))
+        if(is.null(inputVars))
             inputVars = c(codeInfo@inputs, codeInfo@updates)
-        if(missing(outputVars))
+        if(is.null(outputVars))
             outputVars = c(codeInfo@outputs, codeInfo@updates)
     }
 

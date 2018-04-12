@@ -233,10 +233,6 @@ cacheClass = setRefClass("CachingEngine",
         {
             if(!write_allowed)
                 stop("Attempted to write to disk on a CachingEngine which has writing disabled (writing_allowed is FALSE)")
-  #          if(!tmp)
-  #              dir = .self$base_dir
-  #          else
-  #              dir = .self$tmp_base_dir
             
             invisible(sapply(cache_sets, function(x, clr) x$to_disk(clear_mem= clr), clr = clear_mem))
         }

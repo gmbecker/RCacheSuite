@@ -2,7 +2,7 @@
 library(RCacheSuite)
 x = 5
 
-mycache = cachingEngine(base_dir = "./r_caches")
+mycache = cachingEngine(base_dir = file.path(tempdir(), "r_caches"))
 
 
 print(mycache)

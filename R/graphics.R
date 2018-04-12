@@ -13,7 +13,13 @@ redrawPlot = function(recPlot)
         if(is(res, "error"))
             stop(res)
     } else {
-        ## start code from pander package
+        recPlot = fixupRecordedPlot(recPlot)
+        suppressWarnings(grDevices::replayPlot(recPlot))
+    }
+}
+
+fixupRecordedPlot = function(recPlot) {
+       ## start code from pander package
         if (getRversion() < "3.0.0") {
             for (i in 1:length(recPlot[[1]])) {
                 if ("NativeSymbolInfo" %in% 
@@ -34,7 +40,9 @@ redrawPlot = function(recPlot)
                 }
             }
         }
-        suppressWarnings(grDevices::replayPlot(recPlot))
-        ## end code from pander package
-    }
+    recPlot
 }
+
+
+
+
