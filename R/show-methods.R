@@ -2,12 +2,12 @@ setMethod("show", "CachingEngine",
           function(object)
           {
        #       browser()
-              sizes = unlist(sapply(object$cache_sets, function(lst) sapply(lst$cache_data, function(x) x$mem_size())))
+              sizes = unlist(sapply(object$children, function(lst) sapply(lst$children, function(x) x$mem_size())))
                      
               #if the input is list(), sapply always returns list()!
               if(!length(sizes))
                   sizes = 0
-              lens = sapply(object$cache_sets, function(lst) length(lst$cache_data))
+              lens = sapply(object$children, function(lst) length(lst$children))
               if(!length(lens))
                   lens = 0
               totcaches = sum(lens)
@@ -20,7 +20,7 @@ setMethod("show", "CachingEngine",
                                 collapse="\n")
               cat(sprintf(formstring, 
                           object$base_dir,
-                          length(object$cache_sets),
+                          length(object$children),
                           sum(sizes > 0),
                           totcaches,
                           sum(sizes)))

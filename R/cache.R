@@ -1,14 +1,23 @@
-#Other caching mechanisms in R:
-# Biobase::cache Checks in cache for LHS of LHS<-RHS expression and only evaluates RHS if not found in cache
-#R.cache package
-#cacheSweave
-#knitr with cache=TRUE
-#SOAR package, not really the same thing, basically create lazyload dbs for things on the fly and take them out of memory?
-#cacher
-#memoize - Caches output of function call, immediately returns output if function is called again with same inputs. Not clear if it can track more than one set of inputs. I think it may actually modify the function itself akin to trace/debug
+## Other caching mechanisms in R:
+## Biobase::cache Checks in cache for
+##   LHS of LHS<-RHS expression and only evaluates RHS if not found in
+##   cache
+## R.cache package
+## cacheSweave
+## knitr with cache=TRUE
+## SOAR package, not really the same thing, basically create lazyload dbs for
+##   things on the fly and take them out of memory?
+## cacher
+## memoize - Caches output of function call, immediately returns
+##   output if function is called again with same inputs. Not clear if
+##   it can track more than one set of inputs. I think it may actually
+##   modify the function itself akin to trace/debug
 
-#this is a list of classes we know correspond to plots, and whose show functions are assumed to draw the plot.
-#grobs (grid low level objects for image components) are drawn by default when they are created, but their show/print commands do NOT draw them, so they are excluded here
+#this is a list of classes we know correspond to plots, and whose show
+#functions are assumed to draw the plot.  grobs (grid low level
+#objects for image components) are drawn by default when they are
+#created, but their show/print commands do NOT draw them, so they are
+#excluded here
 gclasses = c("trellis", "ggplot", "gg", "ggbio", "recordedplot")
 
 
@@ -267,12 +276,16 @@ evalWithCache = function(code,
     stopMissingInput = FALSE,
     singleEntFun= sameOutVar,
     unCacheable = mustForce,
+    ## passed to eval_fun
     ...)
 {
     if(is.character(code))
     {
         code = readScript("", "R", txt = code)
     }
+    ## we were passed a comment, most likely
+    if(length(code) == 0)
+        invisible(return(NULL))
     
     if(is(code, "Script") && length(code) > 1)
     {
@@ -349,7 +362,13 @@ evalWithCache = function(code,
     ## the (properly handled) code as well as the current values of
     ## all the input variables
     chash = fastdigest(pcode)
-    ihash = fastdigest(mget(inputVars, envir = env, ifnotfound=list(NULL)))
+    inputVals = mget(inputVars, envir = env, ifnotfound=list(NULL))
+    ivarhashes = sapply(inputVals, fastdigest)
+    names(ivarhashes) = inputVars
+    ## this is doublehashing. Should provide fully equivalent uniqueness
+    ## guarantee to hasing the list of actual values, but gives us access
+    ## to the invidividual hashes for provenance.
+    ihash = fastdigest(ivarhashes)
     
     fnd = cache$find_data(chash, ihash)
     if(is(fnd, "CachedData") && !force)
@@ -410,10 +429,20 @@ evalWithCache = function(code,
         #we can control this with an argument but still need to decide the default...
         if(!rand || cacheRand )
         {
-            cset = cache$get_or_create_set(pcode, inputVars, outputVars)
-            #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
+            ## we don't use mget here because we want it to fail if it can't
+            ## find an expected output variable. Thatshould never happen
+            ## and probably means the static analysis (or whatever it
+            ## was overridden with) is wrong.
+            ## sapply provides the names so no need to do that separately
+            outvarhashes = sapply(outputVars,
+                                  function(nm) fastdigest(get(nm, envir = env)))
+#            cset = cache$get_or_create_set(pcode, inputVars, outputVars)
+                                        #XXX right now it always assigns the cache to the first location in cache_dirs, even if there are more than one
+            provdf = makeProvDF(ivarhashes, outvarhashes, pcode, chash)
             newcd = cachedData$new(code_hash = chash,
+                                   code = pcode,
                                    inputs_hash = ihash,
+                                   provstore = provdf,
                                    disk_location = file.path(cache$base_dir,
                                                              sprintf("code_%s", chash)),
                                    tmp_disk_location = file.path(cache$tmp_base_dir,
@@ -421,10 +450,10 @@ evalWithCache = function(code,
                                    .data = new.env(),
                                    file_stale = TRUE,
                                    plot = xxx_graphics, gdevs = gdev,
-                                   write_allowed = cset$write_allowed)
+                                   write_allowed = cache$write_allowed)
             for(o in outlist)
                 assign(o, get(o, envir = env), envir = newcd$.data)
-            cset$add_data(newcd)
+            cache$add_data(newcd)
         }
         returnvalue = return_handler(xxx_returnvalue, xxx_graphics, env, evaled = TRUE, last = last)
     }

@@ -7,7 +7,7 @@ readCachedData = function(dir, load_data = TRUE,
             return(list())
         chash = gsub(".*_([[:alnum:]]*).*", "\\1",
                      normalizePath(file.path(dir, "..")))
-        fils = list.files(dir, pattern="cache_", full.names=TRUE)
+        fils = list.files(dir, pattern="cache_.*\\.rda", full.names=TRUE)
         if(length(exclude_hashes))
         {
             excl = match(exclude_hashes, fils)
@@ -20,8 +20,10 @@ readCachedData = function(dir, load_data = TRUE,
             return(list())
         mapply(function(file, ihash, chash)
                {
+                   
                    cacheout = new("CachedData", code_hash = chash,
                                   inputs_hash = ihash,
+                                  provstore = readProvTab(dirname(file), ihash = ihash),
                                   .data = new.env(),
                                   disk_location = dirname(file),
                                   file_stale = FALSE,
@@ -34,6 +36,13 @@ readCachedData = function(dir, load_data = TRUE,
     }
 
 
+readProvTab = function(dir, ihash = NULL) {
+    if(is.null(ihash))
+        ProvStoreDF(df = read.csv(file.path(dir, "allprov.csv")))
+    else
+        ProvStoreDF(df = read.csv(file.path(dir, paste0(ihash, "_prov.csv"))))
+}
+
 readCodeCache = function(dir, load_data = TRUE, write_allowed = TRUE,
                          write_on_cache = FALSE)
 {
@@ -43,7 +52,8 @@ readCodeCache = function(dir, load_data = TRUE, write_allowed = TRUE,
     code = unparse(parse(file.path(dir, "code.R"), keep.source=FALSE))
     cSetOut = new("CodeCacheSet", hash = hash, cache_dir = dir,
                   code = code, write_allowed = write_allowed,
-                  write_on_cache = write_on_cache)
+                  write_on_cache = write_on_cache,
+                  provstore = readProvTab(dir, NULL))
     cSetOut$populate(load_data = load_data)
     cSetOut
 }

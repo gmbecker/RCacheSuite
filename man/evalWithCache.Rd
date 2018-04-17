@@ -4,7 +4,7 @@
 \alias{evalWithCache}
 \title{evalWithCache}
 \usage{
-evalWithCache(code, codeInfo, inputVars, outputVars,
+evalWithCache(code, codeInfo = NULL, inputVars = NULL, outputVars = NULL,
   cache = cachingEngine(write_on_cache = TRUE), eval_fun = cache$eval_fun,
   return_handler = cache$return_handler, env = .GlobalEnv, force = FALSE,
   cacheRand = FALSE, verbose = FALSE, gexts = "png",

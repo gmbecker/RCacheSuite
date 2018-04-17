@@ -58,3 +58,7 @@ validCodeCache = function(dir)
     }
     valid
 }
+
+isFALSE = function(x) identical(FALSE, x)
+
+getUser = function() system("whoami", intern = TRUE)
