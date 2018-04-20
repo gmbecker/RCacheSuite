@@ -1,3 +1,5 @@
+##' @importFrom utils head read.csv tail
+NULL
 ## Other caching mechanisms in R:
 ## Biobase::cache Checks in cache for
 ##   LHS of LHS<-RHS expression and only evaluates RHS if not found in

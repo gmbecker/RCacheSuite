@@ -1,11 +1,11 @@
 Package: RCacheSuite
-Version: 0.2.1
+Version: 0.2.1.1
 Title: State and Dependency Aware Caching
 Description: A suite of in-memory and on-disk caching mechanisms which takes into account both code content and the value(s) of any input variables the code uses. This opens up the possibility of caching in interactive and parameterized dynamic document settings, where the code remains unchanged but the inputs vary across evaluations.
 Author: Gabriel Becker
 Depends: methods, CodeDepends (>= 0.3-5)
 Imports:  fastdigest, evaluate, igraph
-Suggests: RUnit 
+Suggests: RUnit, knitr
 Maintainer: Gabriel Becker <gmbecker@ucdavis.edu>
 License: Artistic-2.0
 RoxygenNote: 6.0.1

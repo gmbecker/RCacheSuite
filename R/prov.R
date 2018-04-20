@@ -65,7 +65,7 @@ makeProvDF = function(invarhashes = NULL, outvarhashes = NULL, code = NULL,
 ##' @export
 fullprovgraph = function(cacheobj, df = cacheobj$provstore) {
     
-    df2 = subset(df, inputvar != "")
+    df2 = df[df$inputvar != "", ]
     edges = cbind(paste(df2$inputvar, df2$inputvarhash, sep=":"),
                   paste(df2$outputvar, df2$outputvarhash, sep=":"))
     gr = graph_from_edgelist(edges)

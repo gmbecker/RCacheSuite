@@ -45,6 +45,8 @@ populate}
 
 \item{last}{Logical. Is the value being processed the output of the final
 expression in the code being handled.}
+
+\item{stop_on_error}{integer. Passed to evaluate.}
 }
 \value{
 Evaluation functions should return the result of evaluating

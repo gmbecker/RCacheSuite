@@ -101,6 +101,7 @@ make_evaluate_ef = function(source = NULL,
     }
 }
 #' @export
+#' @param stop_on_error integer. Passed to evaluate.
 #' @rdname evalhandlers
 evaluate_ef = make_evaluate_ef()
 
