@@ -37,10 +37,15 @@ readCachedData = function(dir, load_data = TRUE,
 
 
 readProvTab = function(dir, ihash = NULL) {
-    if(is.null(ihash))
-        ProvStoreDF(df = read.csv(file.path(dir, "allprov.csv")))
+    colcl = sapply(provdf(), class)
+    if(is.null(ihash) && file.exists(file.path(dir, "allprov.csv")))
+        ProvStoreDF(df = read.csv(file.path(dir, "allprov.csv"),
+                                  colClasses = colcl))
+    else if(file.exists(file.path(dir, paste0(ihash, "_prov.csv"))))
+        ProvStoreDF(df = read.csv(file.path(dir, paste0(ihash, "_prov.csv")),
+                                  colClasses = colcl))
     else
-        ProvStoreDF(df = read.csv(file.path(dir, paste0(ihash, "_prov.csv"))))
+        ProvStoreDF()
 }
 
 readCodeCache = function(dir, load_data = TRUE, write_allowed = TRUE,

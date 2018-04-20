@@ -19,7 +19,8 @@ provdf = function(outputvar = character(),
                inputvarhash = inputvarhash,
                agent = agent,
                code = code,
-               codehash = codehash)
+               codehash = codehash,
+               stringsAsFactors = FALSE)
 }
                        
 
@@ -50,6 +51,8 @@ setClass("ProvStoreDF",
          contains = "data.frame",
          validity = function(object) {
     provdfrow = provdf()
+    if(!identical(names(object), names(provdfrow)))
+        stop("wrong column names on provdfrow: ", paste(names(object), collapse = ","))
     stopifnot(identical(names(object), names(provdfrow)),
               identical(sapply(object, class), sapply(provdfrow, class)))
     TRUE
@@ -290,7 +293,8 @@ cacheClass = setRefClass("CachingEngine",
             ## the child methods ensure the base directory exists.
             ## XXX should that be the caching-engine's job?
             res = sapply(children, function(x, clr) x$to_disk(clear_mem= clr), clr = clear_mem)
-            invisible(write.csv(provstore, file = file.path(dir, "allprov.csv")))
+            invisible(write.csv(provstore, file = file.path(dir, "allprov.csv", ),
+                                row.names = FALSE))
         }))
     
 
@@ -430,7 +434,8 @@ codeCacheSet = setRefClass("CodeCacheSet",
                       "##################################################",
                       paste(.self$code, collapse="\n"), sep="\n"),
                 file = file.path(dir, "code.R"))
-            invisible(write.csv(provstore, file = file.path(dir, "allprov.csv")))
+            invisible(write.csv(provstore, file = file.path(dir, "allprov.csv"),
+                                row.names = FALSE))
         },
         add_data = function(dat)
         {
@@ -574,7 +579,8 @@ cachedData = setRefClass("CachedData",
                                            file = file.path(location,
                                                             paste0(inputs_hash,
                                                                    "_prov.csv")
-                                                            )
+                                                            ),
+                                           row.names = FALSE
                                            )
                                  
                                  if(clear_mem)

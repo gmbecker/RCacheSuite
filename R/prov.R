@@ -3,6 +3,10 @@ makeProvDF = function(invarhashes = NULL, outvarhashes = NULL, code = NULL,
                       invars = names(invarhashes),
                       outvars = names(outvarhashes),
                       agent = getUser()) {
+    if(length(invarhashes) == 0 && length(outvarhashes) == 0) {
+        ## empty
+        return(ProvStoreDF())
+    }
     if(is.null(invarhashes) || is.null(outvarhashes) || is.null(code))
         stop("One or more required argument was not specified",
              "(required args: invarhashes, otvarhashes, code)")
@@ -33,6 +37,9 @@ makeProvDF = function(invarhashes = NULL, outvarhashes = NULL, code = NULL,
         code = .fixcode(code)
     
     code = rep(code, times = nouts * ninputs)
+    cat("\noutvars: ", outvars, "\ninvars: ", invars,
+        "\ncode(nchar): ", code,"(", nchar(code), ")", "\ncodehash: ", codehash,
+        "\nagent: ", agent, sep = " ")
     ProvStoreDF(outputvar = outvars, outputvarhash = outvarhashes,
                 inputvar = invars, inputvarhash = invarhashes,
                 agent = agent, code = code,
@@ -106,3 +113,14 @@ setMethod("inputvarhashes", "CodeCacheSet", function(obj) inputvarhashes(obj$pro
 setMethod("inputvarhashes", "CachedData", function(obj) inputvarhashes(obj$provstore))
 
 
+## setMethod('[', "ProvStoreDF",
+##           function(x, ...) {
+##     df = `[.data.frame`(x, ...)
+##     new("ProvStoreDF", df)
+## })
+
+## setMethod('[<-', "ProvStoreDF",
+##           function(x, ..., value) {
+##     df = `[<-.data.frame`(x, ..., value = value)
+##     new("ProvStoreDF", df)
+## })

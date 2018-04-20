@@ -148,6 +148,7 @@ noGraphicsRaw = function(val, graphics, env, evaled = FALSE, ...)
 
 missingornull = function(x) missing(x) || is.null(x)
 
+
 #' @title evalWithCache
 #' 
 #' @description This function accepts a piece of R code and performs
@@ -252,6 +253,8 @@ missingornull = function(x) missing(x) || is.null(x)
 #' }
 #' @export
 evalWithCache = function(code,
+    env = parent.frame(), #.GlobalEnv,
+    cache = cachingEngine(write_on_cache = TRUE),
     codeInfo = NULL,
     inputVars = NULL, #overrides automatically detected inputs
     outputVars = NULL, #overrides automatically detected outputs
@@ -263,10 +266,8 @@ evalWithCache = function(code,
     ## Passing in an existing CachingEngine objects modifies that
     ## object in place and gives access to the full spectrum of
     ## caching behaviors offered by the package.
-    cache = cachingEngine(write_on_cache = TRUE),
     eval_fun = cache$eval_fun,
     return_handler = cache$return_handler,
-    env = .GlobalEnv,
     force = FALSE,
     cacheRand = FALSE,
     verbose = FALSE,
